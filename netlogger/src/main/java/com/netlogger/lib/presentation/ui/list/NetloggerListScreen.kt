@@ -2,16 +2,40 @@ package com.netlogger.lib.presentation.ui.list
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
-import androidx.compose.material3.*
-import androidx.compose.runtime.*
+import androidx.compose.material3.DropdownMenuItem
+import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.ExposedDropdownMenuBox
+import androidx.compose.material3.ExposedDropdownMenuDefaults
+import androidx.compose.material3.HorizontalDivider
+import androidx.compose.material3.IconButton
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.Scaffold
+import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
+import androidx.compose.material3.TopAppBar
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.google.gson.Gson
@@ -28,13 +52,32 @@ fun NetloggerListScreen(
     onClose: () -> Unit
 ) {
     val logs by viewModel.logs.collectAsState()
+    NetloggerListContent(
+        logs = logs,
+        onLogClicked = onLogClicked,
+        onClose = onClose,
+        clearLogs = { viewModel.clearLogs() },
+        search = { viewModel.search(it) },
+        filterByType = { viewModel.filterByType(it) }
+    )
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun NetloggerListContent(
+    logs: List<LogListItem>,
+    onLogClicked: (LogEntry, String) -> Unit = { _, _ -> },
+    onClose: () -> Unit = {},
+    clearLogs: () -> Unit = {},
+    search: (String) -> Unit = {},
+    filterByType: (String?) -> Unit = {}
+) {
     var searchQuery by remember { mutableStateOf("") }
     var selectedType by remember { mutableStateOf("ALL") }
     var expanded by remember { mutableStateOf(false) }
-    
+
     val gson = remember { Gson() }
     val types = listOf("ALL", "API", "GENERAL")
-
     Scaffold(
         topBar = {
             TopAppBar(
@@ -45,14 +88,18 @@ fun NetloggerListScreen(
                     }
                 },
                 actions = {
-                    TextButton(onClick = { viewModel.clearLogs() }) {
+                    TextButton(onClick = { clearLogs() }) {
                         Text("Clear")
                     }
                 }
             )
         }
     ) { paddingValues ->
-        Column(modifier = Modifier.fillMaxSize().padding(paddingValues)) {
+        Column(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(paddingValues)
+        ) {
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
@@ -61,17 +108,17 @@ fun NetloggerListScreen(
             ) {
                 OutlinedTextField(
                     value = searchQuery,
-                    onValueChange = { 
+                    onValueChange = {
                         searchQuery = it
-                        viewModel.search(it)
+                        search(it)
                     },
                     placeholder = { Text("Search...") },
                     modifier = Modifier.weight(1f),
                     singleLine = true
                 )
-                
+
                 Spacer(modifier = Modifier.width(8.dp))
-                
+
                 ExposedDropdownMenuBox(
                     expanded = expanded,
                     onExpandedChange = { expanded = !expanded },
@@ -93,7 +140,7 @@ fun NetloggerListScreen(
                                 text = { Text(type) },
                                 onClick = {
                                     selectedType = type
-                                    viewModel.filterByType(type)
+                                    filterByType(type)
                                     expanded = false
                                 }
                             )
@@ -116,6 +163,7 @@ fun NetloggerListScreen(
                                 color = MaterialTheme.colorScheme.onSurfaceVariant
                             )
                         }
+
                         is LogListItem.LogItem -> {
                             LogItemRow(log = item.log) {
                                 onLogClicked(it, gson.toJson(it))
@@ -133,7 +181,7 @@ fun NetloggerListScreen(
 fun LogItemRow(log: LogEntry, onClick: (LogEntry) -> Unit) {
     val timeFormat = remember { SimpleDateFormat("HH:mm:ss.SSS", Locale.getDefault()) }
     val timeString = remember(log.timestamp) { timeFormat.format(Date(log.timestamp)) }
-    
+
     Row(
         modifier = Modifier
             .fillMaxWidth()
@@ -149,7 +197,7 @@ fun LogItemRow(log: LogEntry, onClick: (LogEntry) -> Unit) {
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
                 Spacer(modifier = Modifier.width(8.dp))
-                
+
                 when (log) {
                     is LogEntry.Api -> {
                         Text(
@@ -159,7 +207,8 @@ fun LogItemRow(log: LogEntry, onClick: (LogEntry) -> Unit) {
                             color = Color(0xFF007BFF) // Info
                         )
                         Spacer(modifier = Modifier.width(8.dp))
-                        val statusColor = if (log.statusCode in 200..299) Color(0xFF28A745) else Color(0xFFDC3545)
+                        val statusColor =
+                            if (log.statusCode in 200..299) Color(0xFF28A745) else Color(0xFFDC3545)
                         Text(
                             text = log.statusCode.toString(),
                             fontSize = 12.sp,
@@ -167,8 +216,9 @@ fun LogItemRow(log: LogEntry, onClick: (LogEntry) -> Unit) {
                             color = statusColor
                         )
                     }
+
                     is LogEntry.General -> {
-                        val levelColor = when(log.level.name) {
+                        val levelColor = when (log.level.name) {
                             "INFO" -> Color(0xFF007BFF)
                             "WARNING" -> Color(0xFFFFC107)
                             "ERROR" -> Color(0xFFDC3545)
@@ -190,7 +240,7 @@ fun LogItemRow(log: LogEntry, onClick: (LogEntry) -> Unit) {
                 }
             }
             Spacer(modifier = Modifier.height(4.dp))
-            
+
             when (log) {
                 is LogEntry.Api -> {
                     Text(
@@ -200,6 +250,7 @@ fun LogItemRow(log: LogEntry, onClick: (LogEntry) -> Unit) {
                         overflow = TextOverflow.Ellipsis
                     )
                 }
+
                 is LogEntry.General -> {
                     Text(
                         text = log.message,
@@ -210,7 +261,7 @@ fun LogItemRow(log: LogEntry, onClick: (LogEntry) -> Unit) {
                 }
             }
         }
-        
+
         if (log is LogEntry.Api) {
             Text(
                 text = "${log.totalDuration}ms",
@@ -221,9 +272,9 @@ fun LogItemRow(log: LogEntry, onClick: (LogEntry) -> Unit) {
     }
 }
 
-@androidx.compose.ui.tooling.preview.Preview(showBackground = true)
+@Preview(showBackground = true)
 @Composable
-fun LogItemRowPreview() {
+private fun LogItemRowPreview() {
     MaterialTheme {
         Column {
             LogItemRow(
@@ -272,5 +323,41 @@ fun LogItemRowPreview() {
                 onClick = {}
             )
         }
+    }
+}
+
+@Composable
+@Preview
+private fun NetloggerListContentPreview() {
+    MaterialTheme {
+        NetloggerListContent(logs = listOf(
+            LogListItem.DateHeader(
+                dateLabel = "Yesterday"
+            ),
+            LogListItem.LogItem(
+                LogEntry.Api(
+                    url = "https://api.example.com/v1/login",
+                    method = "POST",
+                    requestHeaders = null,
+                    requestBody = null,
+                    responseHeaders = null,
+                    responseBody = "{}",
+                    statusCode = 500,
+                    totalDuration = 450L,
+                    timestamp = System.currentTimeMillis(),
+                    tag = "API",
+                    requestTime = 0L,
+                    responseTime = 450L
+                )
+            ),
+            LogListItem.LogItem(
+                LogEntry.General(
+                    message = "System initialized successfully",
+                    tag = "AppStart",
+                    level = com.netlogger.lib.domain.model.LogLevel.INFO,
+                    timestamp = System.currentTimeMillis()
+                )
+            ),
+        ))
     }
 }
