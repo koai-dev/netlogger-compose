@@ -1,0 +1,27 @@
+<?xml version="1.0" encoding="utf-8"?>
+<navigation xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    android:id="@+id/netlogger_nav_graph"
+    app:startDestination="@id/netloggerListFragment">
+
+    <fragment
+        android:id="@+id/netloggerListFragment"
+        android:name="com.hms.fnb.netlogger.presentation.ui.netlogger.list.NetloggerListFragment"
+        android:label="Log List">
+        <action
+            android:id="@+id/action_list_to_detail"
+            app:destination="@id/netloggerDetailFragment" />
+    </fragment>
+
+    <fragment
+        android:id="@+id/netloggerDetailFragment"
+        android:name="com.hms.fnb.netlogger.presentation.ui.netlogger.detail.NetloggerDetailFragment"
+        android:label="Log Detail">
+        <argument
+            android:name="LOG_TYPE"
+            app:argType="string" />
+        <argument
+            android:name="LOG_DATA"
+            app:argType="string" />
+    </fragment>
+</navigation>

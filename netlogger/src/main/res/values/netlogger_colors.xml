@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <color name="netlogger_bg">#1E1E1E</color>
+    <color name="netlogger_surface">#2D2D2D</color>
+    <color name="netlogger_text_primary">#E0E0E0</color>
+    <color name="netlogger_text_secondary">#9E9E9E</color>
+    <color name="netlogger_success">#4CAF50</color>
+    <color name="netlogger_error">#F44336</color>
+    <color name="netlogger_warning">#FF9800</color>
+    <color name="netlogger_info">#2196F3</color>
+    <color name="netlogger_divider">#424242</color>
+
+    <color name="netlogger_json_key">#9CDCFE</color>
+    <color name="netlogger_json_string">#CE9178</color>
+    <color name="netlogger_json_number">#B5CEA8</color>
+    <color name="netlogger_json_boolean">#569CD6</color>
+    <color name="netlogger_json_null">#569CD6</color>
+</resources>
