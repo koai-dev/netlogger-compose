@@ -54,7 +54,10 @@ class NetloggerListViewModel(
     private fun applyFilters() {
         var filtered = allLogs
         if (currentTypeFilter != null && currentTypeFilter != "ALL") {
-            filtered = filtered.filter { it.type.name == currentTypeFilter }
+            filtered = when (currentTypeFilter) {
+                "ERROR" -> filtered.filter { it.isErrorLog() }
+                else -> filtered.filter { it.type.name == currentTypeFilter }
+            }
         }
         if (currentQuery.isNotBlank()) {
             filtered = filtered.filter { log ->
@@ -99,6 +102,11 @@ class NetloggerListViewModel(
             result.add(LogListItem.LogItem(log))
         }
         return result
+    }
+
+    private fun LogEntry.isErrorLog(): Boolean = when (this) {
+        is LogEntry.Api -> statusCode !in 200..299
+        is LogEntry.General -> level.name == "ERROR"
     }
 
     private fun isSameDay(cal1: Calendar, cal2: Calendar): Boolean {
