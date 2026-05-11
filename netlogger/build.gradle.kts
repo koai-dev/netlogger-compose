@@ -40,14 +40,14 @@ android {
         }
     }
 }
-
+val libVersion = "1.0.0"
 afterEvaluate {
     publishing {
         publications {
             register<MavenPublication>("release") {
                 groupId = "com.koai"
                 artifactId = "netlogger-compose"
-                version = "1.0.0"
+                version = libVersion
 
                 afterEvaluate {
                     from(components["release"])
@@ -104,4 +104,33 @@ dependencies {
     implementation(libs.koin.android)
     implementation(libs.androidx.compose.material.icons.core)
     implementation(libs.androidx.compose.material.icons.extended)
+}
+
+tasks.register("localBuild") {
+    dependsOn("assembleRelease")
+}
+
+tasks.register("createReleaseTag") {
+    doLast {
+        val tagName = "v$libVersion"
+        try {
+            println("Creating tag: $tagName")
+
+            providers
+                .exec {
+                    commandLine("git", "tag", "-a", tagName, "-m", "Release tag $tagName")
+                }.result
+                .get()
+
+            providers
+                .exec {
+                    commandLine("git", "push", "origin", tagName)
+                }.result
+                .get()
+
+            println("Successfully created and pushed tag: $tagName")
+        } catch (e: Exception) {
+            println("❌ Failed to create/push tag $tagName: ${e.message}")
+        }
+    }
 }
