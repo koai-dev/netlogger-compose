@@ -2,13 +2,12 @@ package com.netlogger.lib.presentation.ui.list
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Scaffold
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
@@ -51,54 +50,60 @@ internal fun NetloggerListContent(
     var selectedFilter by remember { mutableStateOf(NetloggerFilter.ALL) }
     val gson = remember { Gson() }
 
-    Column(
-        modifier = Modifier
-            .fillMaxSize()
-            .background(NetloggerListColors.Screen)
-    ) {
-        NetloggerHeader(
-            onClearLogs = onClearLogs,
-            onSettingsClick = onSettingsClick
-        )
-        NetloggerSearchBar(
-            query = searchQuery,
-            onQueryChanged = {
-                searchQuery = it
-                onSearch(it)
-            },
-            onClearQuery = {
-                searchQuery = ""
-                onSearch("")
-            }
-        )
-        FilterChipsRow(
-            selectedFilter = selectedFilter,
-            onFilterSelected = { filter ->
-                selectedFilter = filter
-                onFilterSelected(filter.queryValue)
-            }
-        )
-        LazyColumn(
+    Scaffold(
+        topBar = {
+            NetloggerHeader(
+                onClearLogs = onClearLogs,
+                onSettingsClick = onSettingsClick
+            )
+        },
+        containerColor = NetloggerListColors.Screen
+    ) { paddingValues ->
+        Column(
             modifier = Modifier
+                .padding(paddingValues)
                 .fillMaxSize()
-                .padding(horizontal = 32.dp)
+                .padding(16.dp)
+                .background(NetloggerListColors.Screen)
         ) {
-            items(logs) { item ->
-                when (item) {
-                    is LogListItem.DateHeader -> DateHeader(item.dateLabel)
-                    is LogListItem.LogItem -> LogEntryCard(
-                        log = item.log,
-                        onClick = { onLogClicked(it, gson.toJson(it)) }
-                    )
+            NetloggerSearchBar(
+                query = searchQuery,
+                onQueryChanged = {
+                    searchQuery = it
+                    onSearch(it)
+                },
+                onClearQuery = {
+                    searchQuery = ""
+                    onSearch("")
+                }
+            )
+            FilterChipsRow(
+                selectedFilter = selectedFilter,
+                onFilterSelected = { filter ->
+                    selectedFilter = filter
+                    onFilterSelected(filter.queryValue)
+                }
+            )
+            LazyColumn(
+                modifier = Modifier
+                    .fillMaxSize()
+            ) {
+                itemsIndexed(logs, key = { index, item -> index }) { index, item ->
+                    when (item) {
+                        is LogListItem.DateHeader -> DateHeader(item.dateLabel)
+                        is LogListItem.LogItem -> LogEntryCard(
+                            log = item.log,
+                            onClick = { onLogClicked(it, gson.toJson(it)) }
+                        )
+                    }
                 }
             }
-            item { Spacer(modifier = Modifier.height(28.dp)) }
         }
     }
 }
 
 
-@Preview(showBackground = true, widthDp = 390, heightDp = 844)
+@Preview
 @Composable
 private fun NetloggerListContentPreview() {
     MaterialTheme {
