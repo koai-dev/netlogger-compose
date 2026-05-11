@@ -360,3 +360,30 @@ fun NetloggerDetailScreenTabResponsePreview() {
         )
     }
 }
+
+@Preview(showBackground = true)
+@Composable
+fun NetloggerDetailScreenDebugPreview() {
+    MaterialTheme {
+        val sampleApiLog = """
+            {
+                "method": "GET",
+                "url": "https://api.netscannerpro.com/v1/network/diagnostics?region=us-east-1&filter=active",
+                "requestHeaders": "{\"Content-Type\": \"application/json\", \"Authorization\": \"Bearer ***\"}",
+                "requestBody": "{\"username\": \"stitch_designer\", \"action\": \"create_ui\", \"timestamp\": 1715682000}",
+                "responseBody": "{\"status\": \"success\", \"data\": {\"id\": 1, \"name\": \"Netlogger\"}}",
+                "statusCode": 200,
+                "requestTime": 22,
+                "responseTime": 123,
+                "totalDuration": 145
+            }
+        """.trimIndent()
+
+        NetloggerDetailScreen(
+            initTab = 2,
+            logType = "DEBUG",
+            jsonString = sampleApiLog,
+            onBack = {}
+        )
+    }
+}
