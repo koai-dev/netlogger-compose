@@ -8,7 +8,10 @@ import androidx.activity.enableEdgeToEdge
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
-import androidx.compose.runtime.*
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import com.netlogger.lib.presentation.ui.detail.NetloggerDetailScreen
 import com.netlogger.lib.presentation.ui.list.NetloggerListScreen
@@ -53,6 +56,7 @@ class NetloggerActivity : ComponentActivity() {
                                 onClose = { finish() }
                             )
                         }
+
                         is NetloggerScreen.Detail -> {
                             NetloggerDetailScreen(
                                 logType = screen.logType,
@@ -60,6 +64,7 @@ class NetloggerActivity : ComponentActivity() {
                                 onBack = { currentScreen = NetloggerScreen.List }
                             )
                         }
+
                         is NetloggerScreen.Settings -> {
                             NetloggerSettingsScreen(
                                 viewModel = settingsViewModel,
