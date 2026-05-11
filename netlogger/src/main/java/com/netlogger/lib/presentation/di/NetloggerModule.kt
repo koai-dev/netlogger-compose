@@ -28,18 +28,22 @@ val netloggerModule = module {
 
     // Repository
     single<INetloggerRepository> { NetloggerRepositoryImpl(get()) }
+    single<com.netlogger.lib.domain.repository.SettingsRepository> { com.netlogger.lib.data.repository.SettingsRepositoryImpl(get()) }
 
     // UseCases
     factory { SaveApiLogUseCase(get()) }
     factory { SaveGeneralLogUseCase(get()) }
     factory { com.netlogger.lib.domain.usecase.GetLogsUseCase(get()) }
     factory { com.netlogger.lib.domain.usecase.ClearLogsUseCase(get()) }
+    factory { com.netlogger.lib.domain.usecase.GetSettingsUseCase(get()) }
+    factory { com.netlogger.lib.domain.usecase.SaveSettingsUseCase(get()) }
 
     // Interceptor & Manager
     single { NetloggerInterceptor(get()) }
     single<INetloggerManager> { NetloggerManagerImpl(get(), get()) }
 
     // ViewModel
-    viewModel { NetloggerListViewModel(get(), get()) }
+    viewModel { NetloggerListViewModel(get(), get(), get()) }
+    viewModel { com.netlogger.lib.presentation.ui.settings.NetloggerSettingsViewModel(get(), get()) }
 }
 

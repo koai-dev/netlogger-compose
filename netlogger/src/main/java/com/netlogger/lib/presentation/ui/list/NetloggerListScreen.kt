@@ -19,22 +19,39 @@ import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import com.google.gson.Gson
 import com.netlogger.lib.domain.model.LogEntry
+import com.netlogger.lib.presentation.ui.filter.NetloggerFilterBottomSheet
 
 @Composable
 fun NetloggerListScreen(
     viewModel: NetloggerListViewModel,
     onLogClicked: (LogEntry, String) -> Unit,
+    onOpenSettings: () -> Unit,
     onClose: () -> Unit
 ) {
     val logs by viewModel.logs.collectAsState()
+    var showFilterSheet by remember { mutableStateOf(false) }
+
     NetloggerListContent(
         logs = logs,
         onLogClicked = onLogClicked,
-        onSettingsClick = onClose,
+        onSettingsClick = onOpenSettings,
+        onFilterClick = { showFilterSheet = true },
         onClearLogs = viewModel::clearLogs,
         onSearch = viewModel::search,
         onFilterSelected = viewModel::filterByType
     )
+
+    if (showFilterSheet) {
+        NetloggerFilterBottomSheet(
+            initialMethods = viewModel.getSelectedMethods(),
+            initialStatus = viewModel.getSelectedStatusGroups(),
+            onApply = { methods, status ->
+                viewModel.applyAdvancedFilters(methods, status)
+                showFilterSheet = false
+            },
+            onDismiss = { showFilterSheet = false }
+        )
+    }
 }
 
 @Composable
@@ -42,6 +59,7 @@ internal fun NetloggerListContent(
     logs: List<LogListItem>,
     onLogClicked: (LogEntry, String) -> Unit = { _, _ -> },
     onSettingsClick: () -> Unit = {},
+    onFilterClick: () -> Unit = {},
     onClearLogs: () -> Unit = {},
     onSearch: (String) -> Unit = {},
     onFilterSelected: (String?) -> Unit = {}
@@ -75,7 +93,8 @@ internal fun NetloggerListContent(
                 onClearQuery = {
                     searchQuery = ""
                     onSearch("")
-                }
+                },
+                onFilterClick = onFilterClick
             )
             FilterChipsRow(
                 selectedFilter = selectedFilter,

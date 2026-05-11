@@ -5,9 +5,11 @@ import androidx.lifecycle.viewModelScope
 import com.netlogger.lib.domain.model.LogEntry
 import com.netlogger.lib.domain.usecase.ClearLogsUseCase
 import com.netlogger.lib.domain.usecase.GetLogsUseCase
+import com.netlogger.lib.domain.usecase.GetSettingsUseCase
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.collectLatest
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 import java.text.SimpleDateFormat
 import java.util.Calendar
@@ -16,7 +18,8 @@ import java.util.Locale
 
 class NetloggerListViewModel(
     private val getLogsUseCase: GetLogsUseCase,
-    private val clearLogsUseCase: ClearLogsUseCase
+    private val clearLogsUseCase: ClearLogsUseCase,
+    private val getSettingsUseCase: GetSettingsUseCase
 ) : ViewModel() {
 
     private val _logs = MutableStateFlow<List<LogListItem>>(emptyList())
@@ -25,11 +28,25 @@ class NetloggerListViewModel(
     private var allLogs: List<LogEntry> = emptyList()
     private var currentQuery = ""
     private var currentTypeFilter: String? = null
+    
+    // Advanced filters
+    private var selectedMethods: Set<String> = emptySet()
+    private var selectedStatusGroups: Set<String> = emptySet()
 
     private val dateFormat = SimpleDateFormat("dd/MM/yyyy", Locale.getDefault())
 
     init {
+        checkAutoReset()
         loadLogs()
+    }
+
+    private fun checkAutoReset() {
+        viewModelScope.launch {
+            val settings = getSettingsUseCase().first()
+            if (settings.autoResetOnStart) {
+                clearLogsUseCase()
+            }
+        }
     }
 
     private fun loadLogs() {
@@ -50,15 +67,25 @@ class NetloggerListViewModel(
         currentTypeFilter = type
         applyFilters()
     }
+    
+    fun applyAdvancedFilters(methods: Set<String>, statusGroups: Set<String>) {
+        selectedMethods = methods
+        selectedStatusGroups = statusGroups
+        applyFilters()
+    }
 
     private fun applyFilters() {
         var filtered = allLogs
+        
+        // Type filter (All, Api, General, Error)
         if (currentTypeFilter != null && currentTypeFilter != "ALL") {
             filtered = when (currentTypeFilter) {
                 "ERROR" -> filtered.filter { it.isErrorLog() }
                 else -> filtered.filter { it.type.name == currentTypeFilter }
             }
         }
+        
+        // Search query
         if (currentQuery.isNotBlank()) {
             filtered = filtered.filter { log ->
                 when (log) {
@@ -73,6 +100,30 @@ class NetloggerListViewModel(
                 }
             }
         }
+        
+        // Method filter
+        if (selectedMethods.isNotEmpty()) {
+            filtered = filtered.filter { log ->
+                log is LogEntry.Api && selectedMethods.contains(log.method)
+            }
+        }
+        
+        // Status filter
+        if (selectedStatusGroups.isNotEmpty()) {
+            filtered = filtered.filter { log ->
+                if (log is LogEntry.Api) {
+                    val code = log.statusCode
+                    when {
+                        code in 200..299 -> selectedStatusGroups.contains("2xx Success")
+                        code in 300..399 -> selectedStatusGroups.contains("3xx Redirection")
+                        code in 400..499 -> selectedStatusGroups.contains("4xx Client Error")
+                        code in 500..599 -> selectedStatusGroups.contains("5xx Server Error")
+                        else -> false
+                    }
+                } else false
+            }
+        }
+        
         _logs.value = groupByDate(filtered)
     }
 
@@ -119,4 +170,7 @@ class NetloggerListViewModel(
             clearLogsUseCase()
         }
     }
+    
+    fun getSelectedMethods() = selectedMethods
+    fun getSelectedStatusGroups() = selectedStatusGroups
 }

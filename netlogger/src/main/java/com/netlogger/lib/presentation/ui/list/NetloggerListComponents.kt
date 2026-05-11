@@ -115,7 +115,8 @@ internal fun NetloggerHeader(onClearLogs: () -> Unit, onSettingsClick: () -> Uni
 internal fun NetloggerSearchBar(
     query: String,
     onQueryChanged: (String) -> Unit,
-    onClearQuery: () -> Unit
+    onClearQuery: () -> Unit,
+    onFilterClick: () -> Unit = {}
 ) {
     Row(
         modifier = Modifier
@@ -162,9 +163,7 @@ internal fun NetloggerSearchBar(
         NetloggerIconButton(
             icon = R.drawable.ic_filter_list,
             colorFilter = NetloggerListColors.Gear,
-            onClick = {
-                //TODO: handle filter click
-            }
+            onClick = onFilterClick
         )
     }
 }

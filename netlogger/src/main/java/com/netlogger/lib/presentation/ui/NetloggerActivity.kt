@@ -12,15 +12,19 @@ import androidx.compose.ui.Modifier
 import com.netlogger.lib.presentation.ui.detail.NetloggerDetailScreen
 import com.netlogger.lib.presentation.ui.list.NetloggerListScreen
 import com.netlogger.lib.presentation.ui.list.NetloggerListViewModel
+import com.netlogger.lib.presentation.ui.settings.NetloggerSettingsScreen
+import com.netlogger.lib.presentation.ui.settings.NetloggerSettingsViewModel
 import org.koin.androidx.viewmodel.ext.android.viewModel
 
 sealed class NetloggerScreen {
     object List : NetloggerScreen()
     data class Detail(val logType: String, val jsonString: String) : NetloggerScreen()
+    object Settings : NetloggerScreen()
 }
 
 class NetloggerActivity : ComponentActivity() {
-    private val viewModel: NetloggerListViewModel by viewModel()
+    private val listViewModel: NetloggerListViewModel by viewModel()
+    private val settingsViewModel: NetloggerSettingsViewModel by viewModel()
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -40,10 +44,11 @@ class NetloggerActivity : ComponentActivity() {
                     when (val screen = currentScreen) {
                         is NetloggerScreen.List -> {
                             NetloggerListScreen(
-                                viewModel = viewModel,
+                                viewModel = listViewModel,
                                 onLogClicked = { log, json ->
                                     currentScreen = NetloggerScreen.Detail(log.type.name, json)
                                 },
+                                onOpenSettings = { currentScreen = NetloggerScreen.Settings },
                                 onClose = { finish() }
                             )
                         }
@@ -51,6 +56,12 @@ class NetloggerActivity : ComponentActivity() {
                             NetloggerDetailScreen(
                                 logType = screen.logType,
                                 jsonString = screen.jsonString,
+                                onBack = { currentScreen = NetloggerScreen.List }
+                            )
+                        }
+                        is NetloggerScreen.Settings -> {
+                            NetloggerSettingsScreen(
+                                viewModel = settingsViewModel,
                                 onBack = { currentScreen = NetloggerScreen.List }
                             )
                         }

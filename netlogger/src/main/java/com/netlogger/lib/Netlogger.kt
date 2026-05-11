@@ -13,10 +13,16 @@ import android.view.Gravity
 import android.widget.FrameLayout
 import androidx.core.content.ContextCompat
 import com.google.android.material.floatingactionbutton.FloatingActionButton
+import com.netlogger.lib.domain.usecase.GetSettingsUseCase
 import com.netlogger.lib.presentation.di.netloggerModule
 import com.netlogger.lib.presentation.manager.INetloggerManager
 import com.netlogger.lib.presentation.ui.NetloggerActivity
 import com.netlogger.lib.presentation.util.ShakeDetector
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.flow.launchIn
+import kotlinx.coroutines.flow.onEach
 import okhttp3.Interceptor
 import org.koin.android.ext.koin.androidContext
 import org.koin.core.context.GlobalContext
@@ -30,6 +36,10 @@ object Netlogger {
     private var sensorManager: SensorManager? = null
     private var currentActivityRef: WeakReference<Activity>? = null
     private var fab: FloatingActionButton? = null
+    
+    private val scope = CoroutineScope(Dispatchers.Main + Job())
+    private var isShakeEnabled = true
+    private var sensitivity = 2.7f
 
     /**
      * Khởi tạo module Netlogger. 
@@ -45,12 +55,31 @@ object Netlogger {
             loadKoinModules(netloggerModule)
         }
 
+        observeSettings()
         setupShakeDetector(application)
+    }
+
+    private fun observeSettings() {
+        val getSettingsUseCase = GlobalContext.get().get<GetSettingsUseCase>()
+        getSettingsUseCase().onEach { settings ->
+            isShakeEnabled = settings.enableShakeDetector
+            sensitivity = settings.shakeSensitivity
+            shakeDetector?.sensitivity = sensitivity
+            
+            // Re-register listener if needed
+            currentActivityRef?.get()?.let { activity ->
+                if (isShakeEnabled) {
+                    registerShakeListener()
+                } else {
+                    unregisterShakeListener()
+                }
+            }
+        }.launchIn(scope)
     }
 
     private fun setupShakeDetector(application: Application) {
         sensorManager = application.getSystemService(Context.SENSOR_SERVICE) as SensorManager
-        shakeDetector = ShakeDetector {
+        shakeDetector = ShakeDetector(sensitivity = sensitivity) {
             currentActivityRef?.get()?.let { activity ->
                 if (activity !is NetloggerActivity) {
                     val intent = Intent(activity, NetloggerActivity::class.java)
@@ -63,13 +92,9 @@ object Netlogger {
             Application.ActivityLifecycleCallbacks {
             override fun onActivityResumed(activity: Activity) {
                 currentActivityRef = WeakReference(activity)
-                val accelerometer = sensorManager?.getDefaultSensor(Sensor.TYPE_ACCELEROMETER)
-                sensorManager?.registerListener(
-                    shakeDetector,
-                    accelerometer,
-                    SensorManager.SENSOR_DELAY_UI
-                )
-
+                if (isShakeEnabled) {
+                    registerShakeListener()
+                }
                 showFloatingButton(activity)
             }
 
@@ -78,18 +103,29 @@ object Netlogger {
                     currentActivityRef?.clear()
                     currentActivityRef = null
                 }
-                sensorManager?.unregisterListener(shakeDetector)
+                unregisterShakeListener()
                 hideFloatingButton(activity)
             }
 
-            override fun onActivityCreated(activity: Activity, savedInstanceState: Bundle?) {
-            }
-
+            override fun onActivityCreated(activity: Activity, savedInstanceState: Bundle?) {}
             override fun onActivityStarted(activity: Activity) {}
             override fun onActivityStopped(activity: Activity) {}
             override fun onActivitySaveInstanceState(activity: Activity, outState: Bundle) {}
             override fun onActivityDestroyed(activity: Activity) {}
         })
+    }
+
+    private fun registerShakeListener() {
+        val accelerometer = sensorManager?.getDefaultSensor(Sensor.TYPE_ACCELEROMETER)
+        sensorManager?.registerListener(
+            shakeDetector,
+            accelerometer,
+            SensorManager.SENSOR_DELAY_UI
+        )
+    }
+
+    private fun unregisterShakeListener() {
+        sensorManager?.unregisterListener(shakeDetector)
     }
 
     /**

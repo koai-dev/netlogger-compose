@@ -6,10 +6,12 @@ import android.hardware.SensorEventListener
 import android.hardware.SensorManager
 import kotlin.math.sqrt
 
-class ShakeDetector(private val onShake: () -> Unit) : SensorEventListener {
+class ShakeDetector(
+    var sensitivity: Float = 2.7f,
+    private val onShake: () -> Unit
+) : SensorEventListener {
 
     companion object {
-        private const val SHAKE_THRESHOLD_GRAVITY = 2.7f
         private const val SHAKE_SLOP_TIME_MS = 500
     }
 
@@ -32,7 +34,7 @@ class ShakeDetector(private val onShake: () -> Unit) : SensorEventListener {
 
         val gForce = sqrt((gX * gX + gY * gY + gZ * gZ).toDouble()).toFloat()
 
-        if (gForce > SHAKE_THRESHOLD_GRAVITY) {
+        if (gForce > sensitivity) {
             val now = System.currentTimeMillis()
             if (mShakeTimestamp + SHAKE_SLOP_TIME_MS > now) {
                 return
