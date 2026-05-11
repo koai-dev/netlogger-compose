@@ -91,6 +91,63 @@ There are two ways to open the Netlogger UI:
   startActivity(intent)
   ```
 
+### 4. Manual Logging (Optional)
+You can also manually log general messages, debug info, or errors using `LogUtil`:
+
+```kotlin
+LogUtil.debug("TAG", "Your message here")
+LogUtil.error("TAG", "Something went wrong")
+LogUtil.info("TAG", "Informational message")
+```
+These logs will appear in the "General" filter category in the log list.
+
+## Production Handling (Best Practice)
+
+To ensure Netlogger has **zero code footprint** in your `release` APK, it is highly recommended to use **Android Source Sets** to provide separate implementations for `debug` and `release`.
+
+### 1. Define the Interface (or shared structure)
+You will create two files with the **exact same package and name** in different source sets.
+
+#### **In `src/debug/java/.../NetloggerProxy.kt`**
+```kotlin
+object NetloggerProxy {
+    fun init(application: Application) {
+        Netlogger.init(application)
+    }
+
+    fun getInterceptor(): Interceptor {
+        return Netlogger.getInterceptor()
+    }
+}
+```
+
+#### **In `src/release/java/.../NetloggerProxy.kt`**
+```kotlin
+object NetloggerProxy {
+    fun init(application: Application) {
+        // No-op in release
+    }
+
+    fun getInterceptor(): Interceptor? {
+        return null // Return null or a dummy interceptor
+    }
+}
+```
+
+### 2. Update Usage
+Now your main application code remains clean and doesn't need to check for `BuildConfig.DEBUG`:
+
+```kotlin
+// In Application.onCreate
+NetloggerProxy.init(this)
+
+// In your OkHttp configuration
+val builder = OkHttpClient.Builder()
+NetloggerProxy.getInterceptor()?.let { 
+    builder.addInterceptor(it) 
+}
+```
+
 ## Configuration
 You can customize Netlogger behavior in the **Settings** screen within the app:
 - **Auto-reset logs**: Automatically clear all logs from previous sessions when the app starts.
