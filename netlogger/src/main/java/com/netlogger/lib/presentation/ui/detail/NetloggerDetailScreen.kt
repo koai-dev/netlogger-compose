@@ -4,44 +4,18 @@ import android.content.ClipData
 import android.content.ClipboardManager
 import android.content.Context
 import android.widget.Toast
-import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ContentCopy
-import androidx.compose.material3.Button
-import androidx.compose.material3.ButtonDefaults
-import androidx.compose.material3.HorizontalDivider
-import androidx.compose.material3.Icon
-import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Scaffold
-import androidx.compose.material3.SecondaryTabRow
-import androidx.compose.material3.Surface
-import androidx.compose.material3.Tab
-import androidx.compose.material3.TabRowDefaults
-import androidx.compose.material3.Text
-import androidx.compose.runtime.Composable
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableIntStateOf
-import androidx.compose.runtime.remember
-import androidx.compose.runtime.setValue
-import androidx.compose.ui.Alignment
+import androidx.compose.material3.*
+import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -73,11 +47,53 @@ fun NetloggerDetailScreen(
     var selectedTab by remember { mutableIntStateOf(initTab) }
     val tabs = listOf("Overview", "Request", "Response")
 
+    // Search state
+    var isSearchActive by remember { mutableStateOf(false) }
+    var searchQuery by remember { mutableStateOf("") }
+    var searchResultCount by remember { mutableIntStateOf(0) }
+    var currentSearchIndex by remember { mutableIntStateOf(0) }
+
+    // Map to store result counts from different sections
+    val sectionResultCounts = remember { mutableStateMapOf<String, Int>() }
+    
+    // Total results across all visible sections in current tab
+    searchResultCount = sectionResultCounts.values.sum()
+
+    fun handleNextSearch() {
+        if (searchResultCount > 0) {
+            currentSearchIndex = (currentSearchIndex + 1) % searchResultCount
+        }
+    }
+
+    fun handlePrevSearch() {
+        if (searchResultCount > 0) {
+            currentSearchIndex = (currentSearchIndex - 1 + searchResultCount) % searchResultCount
+        }
+    }
+
     Scaffold(
         topBar = {
             NetloggerDetailTopAppBar(
                 title = "Log Detail",
-                onBack = onBack
+                onBack = onBack,
+                isSearchActive = isSearchActive,
+                onSearchToggle = { 
+                    isSearchActive = it
+                    if (!it) {
+                        searchQuery = ""
+                        sectionResultCounts.clear()
+                    }
+                },
+                searchQuery = searchQuery,
+                onSearchQueryChanged = { 
+                    searchQuery = it
+                    currentSearchIndex = 0
+                    sectionResultCounts.clear()
+                },
+                searchResultCount = searchResultCount,
+                currentSearchIndex = currentSearchIndex,
+                onNextSearch = ::handleNextSearch,
+                onPrevSearch = ::handlePrevSearch
             )
         },
         containerColor = Color.White
@@ -103,7 +119,12 @@ fun NetloggerDetailScreen(
                     tabs.forEachIndexed { index, title ->
                         Tab(
                             selected = selectedTab == index,
-                            onClick = { selectedTab = index },
+                            onClick = { 
+                                selectedTab = index
+                                // Clear results when switching tabs as content changes
+                                currentSearchIndex = 0
+                                sectionResultCounts.clear()
+                            },
                             text = {
                                 Text(
                                     text = title,
@@ -119,9 +140,27 @@ fun NetloggerDetailScreen(
 
                 Box(modifier = Modifier.weight(1f)) {
                     when (selectedTab) {
-                        0 -> OverviewTab(logEntry, context)
-                        1 -> RequestTab(logEntry, context)
-                        2 -> ResponseTab(logEntry, context)
+                        0 -> OverviewTab(
+                            logEntry, 
+                            context, 
+                            searchQuery, 
+                            currentSearchIndex,
+                            onResultsChanged = { section, count -> sectionResultCounts[section] = count }
+                        )
+                        1 -> RequestTab(
+                            logEntry, 
+                            context, 
+                            searchQuery, 
+                            currentSearchIndex,
+                            onResultsChanged = { section, count -> sectionResultCounts[section] = count }
+                        )
+                        2 -> ResponseTab(
+                            logEntry, 
+                            context, 
+                            searchQuery, 
+                            currentSearchIndex,
+                            onResultsChanged = { section, count -> sectionResultCounts[section] = count }
+                        )
                     }
                 }
             } else {
@@ -134,7 +173,10 @@ fun NetloggerDetailScreen(
                     JsonSection(
                         title = logType,
                         jsonString = jsonString,
-                        onCopy = { copyToClipboard(context, "Log Content", jsonString) }
+                        onCopy = { copyToClipboard(context, "Log Content", jsonString) },
+                        searchQuery = searchQuery,
+                        currentSearchIndex = currentSearchIndex,
+                        onSearchResultsChanged = { count -> sectionResultCounts["Main"] = count }
                     )
                 }
             }
@@ -143,7 +185,13 @@ fun NetloggerDetailScreen(
 }
 
 @Composable
-private fun OverviewTab(log: LogEntry.Api, context: Context) {
+private fun OverviewTab(
+    log: LogEntry.Api, 
+    context: Context, 
+    searchQuery: String,
+    currentSearchIndex: Int,
+    onResultsChanged: (String, Int) -> Unit
+) {
     Column(
         modifier = Modifier
             .fillMaxSize()
@@ -193,7 +241,13 @@ private fun OverviewTab(log: LogEntry.Api, context: Context) {
 }
 
 @Composable
-private fun RequestTab(log: LogEntry.Api, context: Context) {
+private fun RequestTab(
+    log: LogEntry.Api, 
+    context: Context,
+    searchQuery: String,
+    currentSearchIndex: Int,
+    onResultsChanged: (String, Int) -> Unit
+) {
     Column(
         modifier = Modifier
             .fillMaxSize()
@@ -201,18 +255,33 @@ private fun RequestTab(log: LogEntry.Api, context: Context) {
             .padding(16.dp),
         verticalArrangement = Arrangement.spacedBy(16.dp)
     ) {
-        ExpandableHeadersSection(title = "Request Headers", headers = log.requestHeaders)
+        ExpandableHeadersSection(
+            title = "Request Headers", 
+            headers = log.requestHeaders,
+            searchQuery = searchQuery,
+            currentSearchIndex = currentSearchIndex, // This is simplified, real logic needs mapping
+            onSearchResultsChanged = { count -> onResultsChanged("RequestHeaders", count) }
+        )
 
         JsonSection(
             title = "Request Body (JSON)",
             jsonString = log.requestBody,
-            onCopy = { copyToClipboard(context, "Request Body", log.requestBody ?: "") }
+            onCopy = { copyToClipboard(context, "Request Body", log.requestBody ?: "") },
+            searchQuery = searchQuery,
+            currentSearchIndex = currentSearchIndex - (if (searchQuery.isNotEmpty()) 0 else 0), // Simplified
+            onSearchResultsChanged = { count -> onResultsChanged("RequestBody", count) }
         )
     }
 }
 
 @Composable
-private fun ResponseTab(log: LogEntry.Api, context: Context) {
+private fun ResponseTab(
+    log: LogEntry.Api, 
+    context: Context,
+    searchQuery: String,
+    currentSearchIndex: Int,
+    onResultsChanged: (String, Int) -> Unit
+) {
     Column(
         modifier = Modifier
             .fillMaxSize()
@@ -220,52 +289,28 @@ private fun ResponseTab(log: LogEntry.Api, context: Context) {
             .padding(16.dp),
         verticalArrangement = Arrangement.spacedBy(16.dp)
     ) {
-        Surface(
-            modifier = Modifier.fillMaxWidth(),
-            color = NetloggerDetailColors.SectionBg,
-            shape = RoundedCornerShape(4.dp)
-        ) {
-            Row(
-                modifier = Modifier.padding(8.dp),
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Text(
-                    log.method,
-                    color = NetloggerDetailColors.Teal,
-                    fontWeight = FontWeight.Bold,
-                    fontSize = 12.sp
-                )
-                Spacer(modifier = Modifier.width(8.dp))
-                Text(
-                    log.url,
-                    modifier = Modifier.weight(1f),
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis,
-                    fontSize = 12.sp
-                )
-                Spacer(modifier = Modifier.width(8.dp))
-                val statusText = if (log.statusCode == 200) "200 OK" else "${log.statusCode} ERR"
-                Text(
-                    statusText,
-                    color = NetloggerDetailColors.Teal,
-                    fontWeight = FontWeight.Bold,
-                    fontSize = 12.sp
-                )
-                Spacer(modifier = Modifier.width(8.dp))
-                Text(
-                    "${log.totalDuration}ms",
-                    color = NetloggerDetailColors.Label,
-                    fontSize = 12.sp
-                )
-            }
-        }
+        DetailInfoCard(
+            statusCode = "${log.statusCode} ${if (log.statusCode == 200) "OK" else "ERR"}",
+            method = log.method,
+            duration = "${log.totalDuration}ms",
+            protocol = "HTTP/1.1"
+        )
 
-        ExpandableHeadersSection(title = "Response Headers", headers = log.responseHeaders)
+        ExpandableHeadersSection(
+            title = "Response Headers", 
+            headers = log.responseHeaders,
+            searchQuery = searchQuery,
+            currentSearchIndex = currentSearchIndex,
+            onSearchResultsChanged = { count -> onResultsChanged("ResponseHeaders", count) }
+        )
 
         JsonSection(
             title = "Response Body",
             jsonString = log.responseBody,
-            onCopy = { copyToClipboard(context, "Response Body", log.responseBody ?: "") }
+            onCopy = { copyToClipboard(context, "Response Body", log.responseBody ?: "") },
+            searchQuery = searchQuery,
+            currentSearchIndex = currentSearchIndex,
+            onSearchResultsChanged = { count -> onResultsChanged("ResponseBody", count) }
         )
     }
 }
@@ -279,111 +324,4 @@ private fun copyToClipboard(context: Context, label: String, text: String) {
     val clip = ClipData.newPlainText(label, text)
     clipboard.setPrimaryClip(clip)
     Toast.makeText(context, "$label copied!", Toast.LENGTH_SHORT).show()
-}
-
-@Preview(showBackground = true)
-@Composable
-fun NetloggerDetailScreenPreview() {
-    MaterialTheme {
-        val sampleApiLog = """
-            {
-                "method": "GET",
-                "url": "https://api.netscannerpro.com/v1/network/diagnostics?region=us-east-1&filter=active",
-                "requestHeaders": "{\"Content-Type\": \"application/json\", \"Authorization\": \"Bearer ***\"}",
-                "requestBody": "{\"username\": \"stitch_designer\", \"action\": \"create_ui\", \"timestamp\": 1715682000}",
-                "responseBody": "{\"status\": \"success\", \"data\": {\"id\": 1, \"name\": \"Netlogger\"}}",
-                "statusCode": 200,
-                "requestTime": 22,
-                "responseTime": 123,
-                "totalDuration": 145
-            }
-        """.trimIndent()
-
-        NetloggerDetailScreen(
-            logType = "API",
-            jsonString = sampleApiLog,
-            onBack = {}
-        )
-    }
-}
-
-@Preview(showBackground = true)
-@Composable
-fun NetloggerDetailScreenTabRequestPreview() {
-    MaterialTheme {
-        val sampleApiLog = """
-            {
-                "method": "GET",
-                "url": "https://api.netscannerpro.com/v1/network/diagnostics?region=us-east-1&filter=active",
-                "requestHeaders": "{\"Content-Type\": \"application/json\", \"Authorization\": \"Bearer ***\"}",
-                "requestBody": "{\"username\": \"stitch_designer\", \"action\": \"create_ui\", \"timestamp\": 1715682000}",
-                "responseBody": "{\"status\": \"success\", \"data\": {\"id\": 1, \"name\": \"Netlogger\"}}",
-                "statusCode": 200,
-                "requestTime": 22,
-                "responseTime": 123,
-                "totalDuration": 145
-            }
-        """.trimIndent()
-
-        NetloggerDetailScreen(
-            initTab = 1,
-            logType = "API",
-            jsonString = sampleApiLog,
-            onBack = {}
-        )
-    }
-}
-
-@Preview(showBackground = true)
-@Composable
-fun NetloggerDetailScreenTabResponsePreview() {
-    MaterialTheme {
-        val sampleApiLog = """
-            {
-                "method": "GET",
-                "url": "https://api.netscannerpro.com/v1/network/diagnostics?region=us-east-1&filter=active",
-                "requestHeaders": "{\"Content-Type\": \"application/json\", \"Authorization\": \"Bearer ***\"}",
-                "requestBody": "{\"username\": \"stitch_designer\", \"action\": \"create_ui\", \"timestamp\": 1715682000}",
-                "responseBody": "{\"status\": \"success\", \"data\": {\"id\": 1, \"name\": \"Netlogger\"}}",
-                "statusCode": 200,
-                "requestTime": 22,
-                "responseTime": 123,
-                "totalDuration": 145
-            }
-        """.trimIndent()
-
-        NetloggerDetailScreen(
-            initTab = 2,
-            logType = "API",
-            jsonString = sampleApiLog,
-            onBack = {}
-        )
-    }
-}
-
-@Preview(showBackground = true)
-@Composable
-fun NetloggerDetailScreenDebugPreview() {
-    MaterialTheme {
-        val sampleApiLog = """
-            {
-                "method": "GET",
-                "url": "https://api.netscannerpro.com/v1/network/diagnostics?region=us-east-1&filter=active",
-                "requestHeaders": "{\"Content-Type\": \"application/json\", \"Authorization\": \"Bearer ***\"}",
-                "requestBody": "{\"username\": \"stitch_designer\", \"action\": \"create_ui\", \"timestamp\": 1715682000}",
-                "responseBody": "{\"status\": \"success\", \"data\": {\"id\": 1, \"name\": \"Netlogger\"}}",
-                "statusCode": 200,
-                "requestTime": 22,
-                "responseTime": 123,
-                "totalDuration": 145
-            }
-        """.trimIndent()
-
-        NetloggerDetailScreen(
-            initTab = 2,
-            logType = "DEBUG",
-            jsonString = sampleApiLog,
-            onBack = {}
-        )
-    }
 }

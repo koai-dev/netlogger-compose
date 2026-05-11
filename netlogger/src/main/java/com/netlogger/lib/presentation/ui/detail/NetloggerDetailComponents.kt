@@ -4,53 +4,26 @@ import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.FlowRow
-import androidx.compose.foundation.layout.PaddingValues
-import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.fillMaxHeight
-import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.heightIn
-import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
-import androidx.compose.material.icons.filled.ContentCopy
-import androidx.compose.material.icons.filled.KeyboardArrowDown
-import androidx.compose.material.icons.filled.KeyboardArrowUp
-import androidx.compose.material.icons.filled.MoreVert
-import androidx.compose.material3.Card
-import androidx.compose.material3.CardDefaults
-import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.HorizontalDivider
-import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
-import androidx.compose.material3.Surface
-import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
-import androidx.compose.material3.TopAppBar
-import androidx.compose.material3.TopAppBarDefaults
-import androidx.compose.runtime.Composable
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.remember
-import androidx.compose.runtime.setValue
+import androidx.compose.material.icons.filled.*
+import androidx.compose.material3.*
+import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.SolidColor
+import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.netlogger.lib.presentation.ui.components.JsonViewer
+import com.netlogger.lib.presentation.ui.components.highlightText
 
 internal object NetloggerDetailColors {
     val Teal = Color(0xFF00796B)
@@ -70,7 +43,8 @@ internal fun DetailInfoCard(
     statusCode: String,
     method: String,
     duration: String,
-    protocol: String
+    protocol: String,
+    searchQuery: String = ""
 ) {
     Card(
         modifier = Modifier
@@ -90,16 +64,18 @@ internal fun DetailInfoCard(
                 "STATUS CODE",
                 statusCode,
                 NetloggerDetailColors.GreenBadge,
-                NetloggerDetailColors.GreenText
+                NetloggerDetailColors.GreenText,
+                searchQuery
             )
             InfoItem(
                 "METHOD",
                 method,
                 NetloggerDetailColors.BlueBadge,
-                NetloggerDetailColors.BlueText
+                NetloggerDetailColors.BlueText,
+                searchQuery
             )
-            InfoItem("DURATION", duration)
-            InfoItem("PROTOCOL", protocol)
+            InfoItem("DURATION", duration, searchQuery = searchQuery)
+            InfoItem("PROTOCOL", protocol, searchQuery = searchQuery)
         }
     }
 }
@@ -109,7 +85,8 @@ private fun InfoItem(
     label: String,
     value: String,
     badgeBg: Color? = null,
-    badgeFg: Color? = null
+    badgeFg: Color? = null,
+    searchQuery: String = ""
 ) {
     Column {
         Text(
@@ -125,20 +102,18 @@ private fun InfoItem(
                 shape = RoundedCornerShape(4.dp)
             ) {
                 Text(
-                    text = value,
+                    text = highlightText(value, searchQuery, badgeFg),
                     modifier = Modifier.padding(horizontal = 8.dp, vertical = 2.dp),
                     fontSize = 14.sp,
                     fontWeight = FontWeight.Bold,
-                    color = badgeFg,
                     fontFamily = FontFamily.Monospace
                 )
             }
         } else {
             Text(
-                text = value,
+                text = highlightText(value, searchQuery, NetloggerDetailColors.Text),
                 fontSize = 14.sp,
                 fontWeight = FontWeight.Medium,
-                color = NetloggerDetailColors.Text,
                 fontFamily = FontFamily.Monospace
             )
         }
@@ -146,7 +121,7 @@ private fun InfoItem(
 }
 
 @Composable
-internal fun UrlSection(url: String, onCopy: () -> Unit) {
+internal fun UrlSection(url: String, searchQuery: String = "", onCopy: () -> Unit) {
     Column(modifier = Modifier.fillMaxWidth()) {
         Text(
             text = "REQUEST URL",
@@ -164,9 +139,8 @@ internal fun UrlSection(url: String, onCopy: () -> Unit) {
         ) {
             Row(verticalAlignment = Alignment.Top) {
                 Text(
-                    text = url,
+                    text = highlightText(url, searchQuery, Color.White),
                     modifier = Modifier.weight(1f),
-                    color = Color.White,
                     fontSize = 13.sp,
                     fontFamily = FontFamily.Monospace
                 )
@@ -269,7 +243,10 @@ internal fun JsonSection(
     title: String,
     jsonString: String?,
     onCopy: () -> Unit,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
+    searchQuery: String = "",
+    currentSearchIndex: Int = -1,
+    onSearchResultsChanged: (Int) -> Unit = {}
 ) {
     Column(modifier = modifier.fillMaxWidth()) {
         Row(
@@ -306,16 +283,24 @@ internal fun JsonSection(
                 .heightIn(max = 500.dp)
         ) {
             JsonViewer(
-                jsonString = jsonString, modifier = Modifier
-                    .fillMaxWidth()
-                    .fillMaxSize()
+                jsonString = jsonString, 
+                modifier = Modifier.fillMaxWidth().fillMaxSize(),
+                searchQuery = searchQuery,
+                currentSearchIndex = currentSearchIndex,
+                onSearchResultsChanged = onSearchResultsChanged
             )
         }
     }
 }
 
 @Composable
-internal fun ExpandableHeadersSection(title: String, headers: String?) {
+internal fun ExpandableHeadersSection(
+    title: String, 
+    headers: String?,
+    searchQuery: String = "",
+    currentSearchIndex: Int = -1,
+    onSearchResultsChanged: (Int) -> Unit = {}
+) {
     var expanded by remember { mutableStateOf(true) }
 
     Card(
@@ -359,7 +344,10 @@ internal fun ExpandableHeadersSection(title: String, headers: String?) {
                             modifier = Modifier
                                 .fillMaxWidth()
                                 .heightIn(max = 300.dp),
-                            isLight = true
+                            isLight = true,
+                            searchQuery = searchQuery,
+                            currentSearchIndex = currentSearchIndex,
+                            onSearchResultsChanged = onSearchResultsChanged
                         )
                     }
                 }
@@ -370,24 +358,76 @@ internal fun ExpandableHeadersSection(title: String, headers: String?) {
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-internal fun NetloggerDetailTopAppBar(title: String, onBack: () -> Unit) {
+internal fun NetloggerDetailTopAppBar(
+    title: String, 
+    onBack: () -> Unit,
+    searchQuery: String = "",
+    onSearchQueryChanged: (String) -> Unit = {},
+    searchResultCount: Int = 0,
+    currentSearchIndex: Int = 0,
+    onPrevSearch: () -> Unit = {},
+    onNextSearch: () -> Unit = {},
+    isSearchActive: Boolean = false,
+    onSearchToggle: (Boolean) -> Unit = {}
+) {
     TopAppBar(
         title = {
-            Text(
-                text = title,
-                fontSize = 18.sp,
-                fontWeight = FontWeight.Bold,
-                color = NetloggerDetailColors.Text
-            )
+            if (isSearchActive) {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    BasicTextField(
+                        value = searchQuery,
+                        onValueChange = onSearchQueryChanged,
+                        modifier = Modifier.weight(1f),
+                        textStyle = TextStyle(fontSize = 16.sp, color = NetloggerDetailColors.Text),
+                        cursorBrush = SolidColor(NetloggerDetailColors.Teal),
+                        decorationBox = { innerTextField ->
+                            if (searchQuery.isEmpty()) {
+                                Text("Search...", color = Color.Gray, fontSize = 16.sp)
+                            }
+                            innerTextField()
+                        }
+                    )
+                    if (searchQuery.isNotEmpty()) {
+                        Text(
+                            text = if (searchResultCount > 0) "${currentSearchIndex + 1}/$searchResultCount" else "0/0",
+                            fontSize = 12.sp,
+                            color = NetloggerDetailColors.Label,
+                            modifier = Modifier.padding(horizontal = 8.dp)
+                        )
+                        IconButton(onClick = onPrevSearch) {
+                            Icon(Icons.Default.KeyboardArrowUp, contentDescription = "Prev")
+                        }
+                        IconButton(onClick = onNextSearch) {
+                            Icon(Icons.Default.KeyboardArrowDown, contentDescription = "Next")
+                        }
+                    }
+                }
+            } else {
+                Text(
+                    text = title,
+                    fontSize = 18.sp,
+                    fontWeight = FontWeight.Bold,
+                    color = NetloggerDetailColors.Text
+                )
+            }
         },
         navigationIcon = {
-            IconButton(onClick = onBack) {
+            IconButton(onClick = if (isSearchActive) { { onSearchToggle(false) } } else onBack) {
                 Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back")
             }
         },
         actions = {
-            IconButton(onClick = { /* TODO */ }) {
-                Icon(Icons.Default.MoreVert, contentDescription = "More")
+            if (!isSearchActive) {
+                IconButton(onClick = { onSearchToggle(true) }) {
+                    Icon(Icons.Default.Search, contentDescription = "Search")
+                }
+            } else if (searchQuery.isNotEmpty()) {
+                IconButton(onClick = { onSearchQueryChanged("") }) {
+                    Icon(Icons.Default.Close, contentDescription = "Clear")
+                }
             }
         },
         colors = TopAppBarDefaults.topAppBarColors(

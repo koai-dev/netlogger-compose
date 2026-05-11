@@ -1,42 +1,53 @@
 package com.netlogger.lib.presentation.ui.components
 
+import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.LazyListState
+import androidx.compose.foundation.lazy.itemsIndexed
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
-import androidx.compose.runtime.Composable
-import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.remember
-import androidx.compose.runtime.setValue
+import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.text.AnnotatedString
+import androidx.compose.ui.text.SpanStyle
+import androidx.compose.ui.text.buildAnnotatedString
 import androidx.compose.ui.text.font.FontFamily
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.google.gson.JsonElement
 import com.google.gson.JsonParser
 import com.netlogger.lib.presentation.model.JsonNode
 import com.netlogger.lib.presentation.model.NodeType
+import kotlinx.coroutines.launch
 
 val ColorJsonString = Color(0xFF008000)
 val ColorJsonNumber = Color(0xFF0000FF)
 val ColorJsonBoolean = Color(0xFFB22222)
 val ColorJsonNull = Color(0xFF808080)
+val ColorSearchHighlight = Color(0xFFFFEB3B)
+val ColorSearchCurrentHighlight = Color(0xFFFF9800)
 
 @Composable
-fun JsonViewer(jsonString: String?, modifier: Modifier = Modifier, initialType: Int = 0, isLight: Boolean = false) {
+fun JsonViewer(
+    jsonString: String?,
+    modifier: Modifier = Modifier,
+    initialType: Int = 0,
+    isLight: Boolean = false,
+    searchQuery: String = "",
+    currentSearchIndex: Int = -1,
+    onSearchResultsChanged: (Int) -> Unit = {}
+) {
     var rootNodes by remember { mutableStateOf<List<JsonNode>>(emptyList()) }
     var displayNodes by remember { mutableStateOf<List<JsonNode>>(emptyList()) }
+    val listState = rememberLazyListState()
+    val scope = rememberCoroutineScope()
 
     LaunchedEffect(jsonString, initialType) {
         if (jsonString.isNullOrBlank()) {
@@ -74,14 +85,44 @@ fun JsonViewer(jsonString: String?, modifier: Modifier = Modifier, initialType: 
         displayNodes = flatten(rootNodes)
     }
 
-    LazyColumn(modifier = modifier) {
-        items(displayNodes, key = { it.id }) { node ->
+    // Search logic
+    val searchResults = remember(displayNodes, searchQuery) {
+        if (searchQuery.isBlank()) emptyList<Int>()
+        else {
+            displayNodes.mapIndexedNotNull { index, node ->
+                val textToSearch = "${node.key ?: ""}${node.value}"
+                if (textToSearch.contains(searchQuery, ignoreCase = true)) index else null
+            }
+        }
+    }
+
+    LaunchedEffect(searchResults.size) {
+        onSearchResultsChanged(searchResults.size)
+    }
+
+    LaunchedEffect(currentSearchIndex, searchResults) {
+        if (currentSearchIndex in searchResults.indices) {
+            scope.launch {
+                listState.animateScrollToItem(searchResults[currentSearchIndex])
+            }
+        }
+    }
+
+    LazyColumn(modifier = modifier, state = listState) {
+        itemsIndexed(displayNodes, key = { _, node -> node.id }) { index, node ->
+            val isCurrentMatch = searchQuery.isNotBlank() && 
+                    currentSearchIndex in searchResults.indices && 
+                    searchResults[currentSearchIndex] == index
+
             JsonNodeRow(
-                node = node, onToggle = {
+                node = node,
+                onToggle = {
                     node.isExpanded = !node.isExpanded
                     displayNodes = flatten(rootNodes)
                 },
-                isLight = isLight
+                isLight = isLight,
+                searchQuery = searchQuery,
+                isCurrentMatch = isCurrentMatch
             )
         }
     }
@@ -201,10 +242,19 @@ private fun flatten(nodes: List<JsonNode>): List<JsonNode> {
 }
 
 @Composable
-private fun JsonNodeRow(isLight: Boolean = false, node: JsonNode, onToggle: () -> Unit) {
+private fun JsonNodeRow(
+    isLight: Boolean = false,
+    node: JsonNode,
+    onToggle: () -> Unit,
+    searchQuery: String = "",
+    isCurrentMatch: Boolean = false
+) {
+    val backgroundColor = if (isCurrentMatch) ColorSearchCurrentHighlight else Color.Transparent
+
     Row(
         modifier = Modifier
             .fillMaxWidth()
+            .background(backgroundColor)
             .clickable(enabled = node.isExpandable, onClick = onToggle)
             .padding(start = (node.depth * 16).dp, top = 2.dp, bottom = 2.dp),
         verticalAlignment = Alignment.CenterVertically
@@ -223,11 +273,11 @@ private fun JsonNodeRow(isLight: Boolean = false, node: JsonNode, onToggle: () -
         }
 
         if (node.key != null) {
+            val keyText = "\"${node.key}\": "
             Text(
-                text = "\"${node.key}\": ",
+                text = highlightText(keyText, searchQuery, if (isLight) MaterialTheme.colorScheme.onBackground else MaterialTheme.colorScheme.background),
                 fontFamily = FontFamily.Monospace,
-                fontSize = 12.sp,
-                color = if (isLight) MaterialTheme.colorScheme.onBackground else MaterialTheme.colorScheme.background
+                fontSize = 12.sp
             )
         }
 
@@ -247,31 +297,36 @@ private fun JsonNodeRow(isLight: Boolean = false, node: JsonNode, onToggle: () -
         }
 
         Text(
-            text = displayValue,
+            text = highlightText(displayValue, searchQuery, color),
             fontFamily = FontFamily.Monospace,
-            fontSize = 12.sp,
-            color = color
+            fontSize = 12.sp
         )
     }
 }
 
-@androidx.compose.ui.tooling.preview.Preview(showBackground = true)
-@Composable
-fun JsonViewerPreview() {
-    MaterialTheme {
-        val sampleJson = """
-            {
-                "status": 200,
-                "message": "Success",
-                "data": {
-                    "id": 12345,
-                    "isActive": true,
-                    "items": ["apple", "banana", null]
+fun highlightText(text: String, query: String, baseColor: Color): AnnotatedString {
+    if (query.isBlank() || !text.contains(query, ignoreCase = true)) {
+        return AnnotatedString(text, SpanStyle(color = baseColor))
+    }
+
+    return buildAnnotatedString {
+        var start = 0
+        while (start < text.length) {
+            val index = text.indexOf(query, start, ignoreCase = true)
+            if (index == -1) {
+                withStyle(SpanStyle(color = baseColor)) {
+                    append(text.substring(start))
                 }
+                break
+            } else {
+                withStyle(SpanStyle(color = baseColor)) {
+                    append(text.substring(start, index))
+                }
+                withStyle(SpanStyle(color = Color.Black, background = ColorSearchHighlight, fontWeight = FontWeight.Bold)) {
+                    append(text.substring(index, index + query.length))
+                }
+                start = index + query.length
             }
-        """.trimIndent()
-        Box(modifier = Modifier.padding(16.dp)) {
-            JsonViewer(jsonString = sampleJson)
         }
     }
 }
