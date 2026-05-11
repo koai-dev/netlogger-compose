@@ -9,10 +9,12 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.tooling.preview.Preview
 import com.netlogger.lib.presentation.util.LogUtil
 import com.netlogger.sampleapp.ui.theme.NetloggerTheme
+import kotlinx.coroutines.delay
 
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -29,6 +31,7 @@ class MainActivity : ComponentActivity() {
             }
         }
         LogUtil.log("absndjnadskc", "ấnkdnaksd")
+
     }
 }
 
@@ -38,6 +41,10 @@ fun Greeting(name: String, modifier: Modifier = Modifier) {
         text = "Hello $name!",
         modifier = modifier
     )
+    LaunchedEffect(Unit) {
+        delay(3000)
+        LogUtil.log("ok", "ấnkdnaksd")
+    }
 }
 
 @Preview(showBackground = true)

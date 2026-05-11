@@ -18,8 +18,7 @@ import java.util.Locale
 
 class NetloggerListViewModel(
     private val getLogsUseCase: GetLogsUseCase,
-    private val clearLogsUseCase: ClearLogsUseCase,
-    private val getSettingsUseCase: GetSettingsUseCase
+    private val clearLogsUseCase: ClearLogsUseCase
 ) : ViewModel() {
 
     private val _logs = MutableStateFlow<List<LogListItem>>(emptyList())
@@ -36,17 +35,7 @@ class NetloggerListViewModel(
     private val dateFormat = SimpleDateFormat("dd/MM/yyyy", Locale.getDefault())
 
     init {
-        checkAutoReset()
         loadLogs()
-    }
-
-    private fun checkAutoReset() {
-        viewModelScope.launch {
-            val settings = getSettingsUseCase().first()
-            if (settings.autoResetOnStart) {
-                clearLogsUseCase()
-            }
-        }
     }
 
     private fun loadLogs() {

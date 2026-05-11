@@ -43,7 +43,7 @@ val netloggerModule = module {
     single<INetloggerManager> { NetloggerManagerImpl(get(), get()) }
 
     // ViewModel
-    viewModel { NetloggerListViewModel(get(), get(), get()) }
+    viewModel { NetloggerListViewModel(get(), get()) }
     viewModel { com.netlogger.lib.presentation.ui.settings.NetloggerSettingsViewModel(get(), get()) }
 }
 

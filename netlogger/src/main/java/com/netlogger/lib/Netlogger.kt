@@ -22,8 +22,10 @@ import com.netlogger.lib.presentation.util.ShakeDetector
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.launchIn
 import kotlinx.coroutines.flow.onEach
+import kotlinx.coroutines.launch
 import okhttp3.Interceptor
 import org.koin.android.ext.koin.androidContext
 import org.koin.core.context.GlobalContext
@@ -41,6 +43,7 @@ object Netlogger {
     private val scope = CoroutineScope(Dispatchers.Main + Job())
     private var isShakeEnabled = true
     private var sensitivity = 2.7f
+    private var hasAutoResetExecuted = false
 
     /**
      * Khởi tạo module Netlogger. 
@@ -55,9 +58,23 @@ object Netlogger {
         } catch (e: Exception) {
             loadKoinModules(netloggerModule)
         }
-
+        checkAutoReset()
         observeSettings()
         setupShakeDetector(application)
+    }
+
+    private fun checkAutoReset() {
+        if (hasAutoResetExecuted) return
+        hasAutoResetExecuted = true
+
+        scope.launch {
+            val getSettingsUseCase = GlobalContext.get().get<GetSettingsUseCase>()
+            val clearLogsUseCase = GlobalContext.get().get<com.netlogger.lib.domain.usecase.ClearLogsUseCase>()
+            val settings = getSettingsUseCase().first()
+            if (settings.autoResetOnStart) {
+                clearLogsUseCase()
+            }
+        }
     }
 
     private fun observeSettings() {
