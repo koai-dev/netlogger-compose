@@ -21,6 +21,7 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.netlogger.lib.R
+import com.netlogger.lib.domain.model.LogSettings
 import com.netlogger.lib.presentation.ui.detail.NetloggerDetailColors
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -41,7 +42,7 @@ fun NetloggerSettingsScreen(
                     }
                 },
                 actions = {
-                    IconButton(onClick = { /* Save or just back */ onBack() }) {
+                    IconButton(onClick = { onBack() }) {
                         Icon(Icons.Default.Save, contentDescription = "Save", tint = NetloggerDetailColors.Teal)
                     }
                 },
@@ -50,110 +51,127 @@ fun NetloggerSettingsScreen(
         },
         containerColor = Color(0xFFF8FAFC)
     ) { paddingValues ->
-        Column(
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(paddingValues)
-                .verticalScroll(rememberScrollState())
-                .padding(16.dp),
-            verticalArrangement = Arrangement.spacedBy(24.dp)
-        ) {
-            // Log Management
-            SettingsSection(title = "Log Management") {
-                SettingToggleItem(
-                    title = "Auto-reset logs",
-                    subtitle = "Clear all logs when app starts",
-                    checked = settings.autoResetOnStart,
-                    onCheckedChange = { viewModel.updateAutoReset(it) }
-                )
-            }
+        NetloggerSettingsContent(
+            settings = settings,
+            paddingValues = paddingValues,
+            onAutoResetChange = { viewModel.updateAutoReset(it) },
+            onShakeDetectorChange = { viewModel.updateShakeDetector(it) },
+            onShakeSensitivityChange = { viewModel.updateShakeSensitivity(it) }
+        )
+    }
+}
 
-            // Shake to Report
-            SettingsSection(title = "Shake to Report") {
-                SettingToggleItem(
-                    title = "Enable Shake Detector",
-                    subtitle = "Shake device to instantly capture network state",
-                    checked = settings.enableShakeDetector,
-                    onCheckedChange = { viewModel.updateShakeDetector(it) }
-                )
-                
-                if (settings.enableShakeDetector) {
-                    HorizontalDivider(modifier = Modifier.padding(vertical = 8.dp), thickness = 0.5.dp)
-                    Column(modifier = Modifier.padding(vertical = 8.dp)) {
-                        Row(
-                            modifier = Modifier.fillMaxWidth(),
-                            horizontalArrangement = Arrangement.SpaceBetween,
-                            verticalAlignment = Alignment.CenterVertically
+@Composable
+private fun NetloggerSettingsContent(
+    settings: LogSettings,
+    paddingValues: PaddingValues,
+    onAutoResetChange: (Boolean) -> Unit,
+    onShakeDetectorChange: (Boolean) -> Unit,
+    onShakeSensitivityChange: (Float) -> Unit
+) {
+    Column(
+        modifier = Modifier
+            .fillMaxSize()
+            .padding(paddingValues)
+            .verticalScroll(rememberScrollState())
+            .padding(16.dp),
+        verticalArrangement = Arrangement.spacedBy(24.dp)
+    ) {
+        // Log Management
+        SettingsSection(title = "Log Management") {
+            SettingToggleItem(
+                title = "Auto-reset logs",
+                subtitle = "Clear all logs when app starts",
+                checked = settings.autoResetOnStart,
+                onCheckedChange = onAutoResetChange
+            )
+        }
+
+        // Shake to Report
+        SettingsSection(title = "Shake to Report") {
+            SettingToggleItem(
+                title = "Enable Shake Detector",
+                subtitle = "Shake device to instantly capture network state",
+                checked = settings.enableShakeDetector,
+                onCheckedChange = onShakeDetectorChange
+            )
+            
+            if (settings.enableShakeDetector) {
+                HorizontalDivider(modifier = Modifier.padding(vertical = 8.dp), thickness = 0.5.dp)
+                Column(modifier = Modifier.padding(vertical = 8.dp)) {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Text("Sensitivity", fontSize = 14.sp, fontWeight = FontWeight.Medium)
+                        Surface(
+                            color = Color(0xFFE0F2F1),
+                            shape = RoundedCornerShape(4.dp)
                         ) {
-                            Text("Sensitivity", fontSize = 14.sp, fontWeight = FontWeight.Medium)
-                            Surface(
-                                color = Color(0xFFE0F2F1),
-                                shape = RoundedCornerShape(4.dp)
-                            ) {
-                                val label = when {
-                                    settings.shakeSensitivity < 1.5f -> "LOW"
-                                    settings.shakeSensitivity < 3.0f -> "MEDIUM"
-                                    else -> "HIGH"
-                                }
-                                Text(
-                                    text = label,
-                                    modifier = Modifier.padding(horizontal = 8.dp, vertical = 2.dp),
-                                    fontSize = 12.sp,
-                                    fontWeight = FontWeight.Bold,
-                                    color = Color(0xFF00796B)
-                                )
+                            val label = when {
+                                settings.shakeSensitivity < 1.5f -> "LOW"
+                                settings.shakeSensitivity < 3.0f -> "MEDIUM"
+                                else -> "HIGH"
                             }
-                        }
-                        Slider(
-                            value = settings.shakeSensitivity,
-                            onValueChange = { viewModel.updateShakeSensitivity(it) },
-                            valueRange = 1f..5f,
-                            colors = SliderDefaults.colors(
-                                thumbColor = Color(0xFF00796B),
-                                activeTrackColor = Color(0xFF00796B)
+                            Text(
+                                text = label,
+                                modifier = Modifier.padding(horizontal = 8.dp, vertical = 2.dp),
+                                fontSize = 12.sp,
+                                fontWeight = FontWeight.Bold,
+                                color = Color(0xFF00796B)
                             )
-                        )
-                        Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-                            Text("Low", fontSize = 12.sp, color = Color.Gray)
-                            Text("High", fontSize = 12.sp, color = Color.Gray)
                         }
+                    }
+                    Slider(
+                        value = settings.shakeSensitivity,
+                        onValueChange = onShakeSensitivityChange,
+                        valueRange = 1f..5f,
+                        colors = SliderDefaults.colors(
+                            thumbColor = Color(0xFF00796B),
+                            activeTrackColor = Color(0xFF00796B)
+                        )
+                    )
+                    Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+                        Text("Low", fontSize = 12.sp, color = Color.Gray)
+                        Text("High", fontSize = 12.sp, color = Color.Gray)
                     }
                 }
             }
+        }
 
-            // About
-            SettingsSection(title = "About") {
-                Column(
+        // About
+        SettingsSection(title = "About") {
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(vertical = 16.dp),
+                horizontalAlignment = Alignment.CenterHorizontally
+            ) {
+                Box(
                     modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(vertical = 16.dp),
-                    horizontalAlignment = Alignment.CenterHorizontally
+                        .size(64.dp)
+                        .clip(RoundedCornerShape(16.dp))
+                        .background(Color(0xFF00796B)),
+                    contentAlignment = Alignment.Center
                 ) {
-                    Box(
-                        modifier = Modifier
-                            .size(64.dp)
-                            .clip(RoundedCornerShape(16.dp))
-                            .background(Color(0xFF00796B)),
-                        contentAlignment = Alignment.Center
-                    ) {
-                        Image(
-                            painter = painterResource(R.drawable.ic_terminal),
-                            contentDescription = null,
-                            modifier = Modifier.size(32.dp)
-                        )
-                    }
-                    Spacer(modifier = Modifier.height(16.dp))
-                    Text("NetScanner Pro", fontSize = 18.sp, fontWeight = FontWeight.Bold)
-                    Text("Version 1.0.0", fontSize = 14.sp, color = Color.Gray)
-                    Spacer(modifier = Modifier.height(12.dp))
-                    Text(
-                        "Powered by Clean Architecture & Koin dependency injection.",
-                        fontSize = 13.sp,
-                        color = Color.Gray,
-                        textAlign = TextAlign.Center,
-                        modifier = Modifier.padding(horizontal = 24.dp)
+                    Image(
+                        painter = painterResource(R.drawable.ic_terminal),
+                        contentDescription = null,
+                        modifier = Modifier.size(32.dp)
                     )
                 }
+                Spacer(modifier = Modifier.height(16.dp))
+                Text("NetScanner Pro", fontSize = 18.sp, fontWeight = FontWeight.Bold)
+                Text("Version 1.0.0", fontSize = 14.sp, color = Color.Gray)
+                Spacer(modifier = Modifier.height(12.dp))
+                Text(
+                    "Powered by Clean Architecture & Koin dependency injection.",
+                    fontSize = 13.sp,
+                    color = Color.Gray,
+                    textAlign = TextAlign.Center,
+                    modifier = Modifier.padding(horizontal = 24.dp)
+                )
             }
         }
     }
@@ -227,52 +245,17 @@ fun NetloggerSettingsPreview() {
             },
             containerColor = Color(0xFFF8FAFC)
         ) { paddingValues ->
-            Column(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .padding(paddingValues)
-                    .padding(16.dp),
-                verticalArrangement = Arrangement.spacedBy(24.dp)
-            ) {
-                SettingsSection(title = "Log Management") {
-                    SettingToggleItem(
-                        title = "Auto-reset logs",
-                        subtitle = "Clear all logs when app starts",
-                        checked = true,
-                        onCheckedChange = {}
-                    )
-                }
-
-                SettingsSection(title = "Shake to Report") {
-                    SettingToggleItem(
-                        title = "Enable Shake Detector",
-                        subtitle = "Shake device to instantly capture network state",
-                        checked = true,
-                        onCheckedChange = {}
-                    )
-                    HorizontalDivider(modifier = Modifier.padding(vertical = 8.dp), thickness = 0.5.dp)
-                    Column(modifier = Modifier.padding(vertical = 8.dp)) {
-                        Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-                            Text("Sensitivity", fontSize = 14.sp, fontWeight = FontWeight.Medium)
-                            Surface(color = Color(0xFFE0F2F1), shape = RoundedCornerShape(4.dp)) {
-                                Text("MEDIUM", modifier = Modifier.padding(horizontal = 8.dp, vertical = 2.dp), fontSize = 12.sp, fontWeight = FontWeight.Bold, color = Color(0xFF00796B))
-                            }
-                        }
-                        Slider(value = 0.5f, onValueChange = {}, colors = SliderDefaults.colors(thumbColor = Color(0xFF00796B), activeTrackColor = Color(0xFF00796B)))
-                    }
-                }
-
-                SettingsSection(title = "About") {
-                    Column(modifier = Modifier.fillMaxWidth().padding(vertical = 16.dp), horizontalAlignment = Alignment.CenterHorizontally) {
-                        Box(modifier = Modifier.size(64.dp).clip(RoundedCornerShape(16.dp)).background(Color(0xFF00796B)), contentAlignment = Alignment.Center) {
-                            Icon(painter = painterResource(R.drawable.ic_terminal), contentDescription = null, tint = Color.White, modifier = Modifier.size(32.dp))
-                        }
-                        Spacer(modifier = Modifier.height(16.dp))
-                        Text("NetScanner Pro", fontSize = 18.sp, fontWeight = FontWeight.Bold)
-                        Text("Version 1.0.0", fontSize = 14.sp, color = Color.Gray)
-                    }
-                }
-            }
+            NetloggerSettingsContent(
+                settings = LogSettings(
+                    autoResetOnStart = true,
+                    enableShakeDetector = true,
+                    shakeSensitivity = 2.7f
+                ),
+                paddingValues = paddingValues,
+                onAutoResetChange = {},
+                onShakeDetectorChange = {},
+                onShakeSensitivityChange = {}
+            )
         }
     }
 }
