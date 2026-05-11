@@ -13,10 +13,17 @@ import android.view.Gravity
 import android.widget.FrameLayout
 import androidx.appcompat.view.ContextThemeWrapper
 import androidx.core.content.ContextCompat
+import androidx.room.Room
 import com.google.android.material.floatingactionbutton.FloatingActionButton
-import com.netlogger.lib.domain.usecase.GetSettingsUseCase
-import com.netlogger.lib.presentation.di.netloggerModule
+import com.netlogger.lib.data.repository.NetloggerRepositoryImpl
+import com.netlogger.lib.data.repository.SettingsRepositoryImpl
+import com.netlogger.lib.data.source.local.NetloggerDatabase
+import com.netlogger.lib.domain.repository.INetloggerRepository
+import com.netlogger.lib.domain.repository.SettingsRepository
+import com.netlogger.lib.domain.usecase.*
 import com.netlogger.lib.presentation.manager.INetloggerManager
+import com.netlogger.lib.presentation.manager.NetloggerInterceptor
+import com.netlogger.lib.presentation.manager.NetloggerManagerImpl
 import com.netlogger.lib.presentation.ui.NetloggerActivity
 import com.netlogger.lib.presentation.util.ShakeDetector
 import kotlinx.coroutines.CoroutineScope
@@ -27,10 +34,6 @@ import kotlinx.coroutines.flow.launchIn
 import kotlinx.coroutines.flow.onEach
 import kotlinx.coroutines.launch
 import okhttp3.Interceptor
-import org.koin.android.ext.koin.androidContext
-import org.koin.core.context.GlobalContext
-import org.koin.core.context.loadKoinModules
-import org.koin.core.context.startKoin
 import java.lang.ref.WeakReference
 
 object Netlogger {
@@ -45,22 +48,54 @@ object Netlogger {
     private var sensitivity = 2.7f
     private var hasAutoResetExecuted = false
 
+    // Manual Dependency Injection Container
+    internal lateinit var database: NetloggerDatabase
+    internal lateinit var repository: INetloggerRepository
+    internal lateinit var settingsRepository: SettingsRepository
+    internal lateinit var netloggerManager: INetloggerManager
+    
+    // Use Cases
+    internal lateinit var getSettingsUseCase: GetSettingsUseCase
+    internal lateinit var saveSettingsUseCase: SaveSettingsUseCase
+    internal lateinit var getLogsUseCase: GetLogsUseCase
+    internal lateinit var clearLogsUseCase: ClearLogsUseCase
+    internal lateinit var saveApiLogUseCase: SaveApiLogUseCase
+    internal lateinit var saveGeneralLogUseCase: SaveGeneralLogUseCase
+
     /**
      * Khởi tạo module Netlogger. 
-     * Tự động handle việc load module Koin và đăng ký lắc điện thoại.
+     * Tự động handle việc khởi tạo dependencies và đăng ký lắc điện thoại.
      */
     fun init(application: Application) {
-        try {
-            startKoin {
-                androidContext(application)
-                modules(netloggerModule)
-            }
-        } catch (e: Exception) {
-            loadKoinModules(netloggerModule)
-        }
+        initializeDependencies(application)
+        
         checkAutoReset()
         observeSettings()
         setupShakeDetector(application)
+    }
+
+    private fun initializeDependencies(context: Context) {
+        if (::database.isInitialized) return
+
+        database = Room.databaseBuilder(
+            context.applicationContext,
+            NetloggerDatabase::class.java,
+            "netlogger_database"
+        ).fallbackToDestructiveMigration(false).build()
+
+        val logDao = database.logDao()
+        repository = NetloggerRepositoryImpl(logDao)
+        settingsRepository = SettingsRepositoryImpl(context.applicationContext)
+
+        saveApiLogUseCase = SaveApiLogUseCase(repository)
+        saveGeneralLogUseCase = SaveGeneralLogUseCase(repository)
+        getLogsUseCase = GetLogsUseCase(repository)
+        clearLogsUseCase = ClearLogsUseCase(repository)
+        getSettingsUseCase = GetSettingsUseCase(settingsRepository)
+        saveSettingsUseCase = SaveSettingsUseCase(settingsRepository)
+
+        val interceptor = NetloggerInterceptor(saveApiLogUseCase)
+        netloggerManager = NetloggerManagerImpl(saveGeneralLogUseCase, interceptor)
     }
 
     private fun checkAutoReset() {
@@ -68,8 +103,6 @@ object Netlogger {
         hasAutoResetExecuted = true
 
         scope.launch {
-            val getSettingsUseCase = GlobalContext.get().get<GetSettingsUseCase>()
-            val clearLogsUseCase = GlobalContext.get().get<com.netlogger.lib.domain.usecase.ClearLogsUseCase>()
             val settings = getSettingsUseCase().first()
             if (settings.autoResetOnStart) {
                 clearLogsUseCase()
@@ -78,7 +111,6 @@ object Netlogger {
     }
 
     private fun observeSettings() {
-        val getSettingsUseCase = GlobalContext.get().get<GetSettingsUseCase>()
         getSettingsUseCase().onEach { settings ->
             isShakeEnabled = settings.enableShakeDetector
             sensitivity = settings.shakeSensitivity
@@ -150,8 +182,7 @@ object Netlogger {
      * Lấy Interceptor để gắn vào OkHttpClient.
      */
     fun getInterceptor(): Interceptor {
-        val manager = GlobalContext.get().get<INetloggerManager>()
-        return manager.getInterceptor()
+        return netloggerManager.getInterceptor()
     }
 
     @SuppressLint("RestrictedApi")

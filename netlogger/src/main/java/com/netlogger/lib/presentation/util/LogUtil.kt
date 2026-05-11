@@ -1,13 +1,13 @@
 package com.netlogger.lib.presentation.util
 
+import com.netlogger.lib.Netlogger
 import com.netlogger.lib.domain.model.LogLevel
 import com.netlogger.lib.presentation.manager.INetloggerManager
-import org.koin.core.context.GlobalContext
 
 object LogUtil {
     private val netloggerManager: INetloggerManager?
         get() = try {
-            GlobalContext.get().get()
+            Netlogger.netloggerManager
         } catch (e: Exception) {
             null
         }

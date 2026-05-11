@@ -40,7 +40,7 @@ android {
         }
     }
 }
-val libVersion = "1.0.0"
+val libVersion = "1.1.0"
 afterEvaluate {
     publishing {
         publications {
@@ -101,7 +101,6 @@ dependencies {
     implementation(libs.okhttp)
 
     // Koin
-    implementation(libs.koin.android)
     implementation(libs.androidx.compose.material.icons.core)
     implementation(libs.androidx.compose.material.icons.extended)
 }
