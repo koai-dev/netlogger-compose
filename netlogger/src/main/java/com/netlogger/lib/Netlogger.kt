@@ -11,6 +11,7 @@ import android.hardware.SensorManager
 import android.os.Bundle
 import android.view.Gravity
 import android.widget.FrameLayout
+import androidx.appcompat.view.ContextThemeWrapper
 import androidx.core.content.ContextCompat
 import com.google.android.material.floatingactionbutton.FloatingActionButton
 import com.netlogger.lib.domain.usecase.GetSettingsUseCase
@@ -36,7 +37,7 @@ object Netlogger {
     private var sensorManager: SensorManager? = null
     private var currentActivityRef: WeakReference<Activity>? = null
     private var fab: FloatingActionButton? = null
-    
+
     private val scope = CoroutineScope(Dispatchers.Main + Job())
     private var isShakeEnabled = true
     private var sensitivity = 2.7f
@@ -65,7 +66,7 @@ object Netlogger {
             isShakeEnabled = settings.enableShakeDetector
             sensitivity = settings.shakeSensitivity
             shakeDetector?.sensitivity = sensitivity
-            
+
             // Re-register listener if needed
             currentActivityRef?.get()?.let { activity ->
                 if (isShakeEnabled) {
@@ -140,8 +141,14 @@ object Netlogger {
     private fun showFloatingButton(activity: Activity) {
         if (fab != null) return
 
+        // Wrap the activity context with a MaterialComponents theme to avoid crash if host app uses a different theme
+        val contextWrapper = ContextThemeWrapper(
+            activity,
+            com.google.android.material.R.style.Theme_MaterialComponents_Light_NoActionBar
+        )
+
         val root = activity.window.decorView as FrameLayout
-        fab = FloatingActionButton(activity).apply {
+        fab = FloatingActionButton(contextWrapper).apply {
             setImageResource(android.R.drawable.ic_menu_info_details)
             size = FloatingActionButton.SIZE_NORMAL
             backgroundTintList = ColorStateList.valueOf(
