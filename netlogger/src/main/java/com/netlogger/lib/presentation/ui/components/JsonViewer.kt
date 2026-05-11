@@ -1,12 +1,22 @@
 package com.netlogger.lib.presentation.ui.components
 
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
-import androidx.compose.runtime.*
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
@@ -24,7 +34,7 @@ val ColorJsonBoolean = Color(0xFFB22222)
 val ColorJsonNull = Color(0xFF808080)
 
 @Composable
-fun JsonViewer(jsonString: String?, modifier: Modifier = Modifier, initialType: Int = 0) {
+fun JsonViewer(jsonString: String?, modifier: Modifier = Modifier, initialType: Int = 0, isLight: Boolean = false) {
     var rootNodes by remember { mutableStateOf<List<JsonNode>>(emptyList()) }
     var displayNodes by remember { mutableStateOf<List<JsonNode>>(emptyList()) }
 
@@ -50,47 +60,122 @@ fun JsonViewer(jsonString: String?, modifier: Modifier = Modifier, initialType: 
             val rootNode = buildJsonTree(element, null, 0, true)
             rootNodes = listOf(rootNode)
         } catch (e: Exception) {
-            rootNodes = listOf(JsonNode(key = null, value = dataToParse, isExpandable = false, isExpanded = false, depth = 0, type = NodeType.STRING))
+            rootNodes = listOf(
+                JsonNode(
+                    key = null,
+                    value = dataToParse,
+                    isExpandable = false,
+                    isExpanded = false,
+                    depth = 0,
+                    type = NodeType.STRING
+                )
+            )
         }
         displayNodes = flatten(rootNodes)
     }
 
-    LazyColumn(modifier = modifier.fillMaxSize()) {
+    LazyColumn(modifier = modifier) {
         items(displayNodes, key = { it.id }) { node ->
-            JsonNodeRow(node = node, onToggle = {
-                node.isExpanded = !node.isExpanded
-                displayNodes = flatten(rootNodes)
-            })
+            JsonNodeRow(
+                node = node, onToggle = {
+                    node.isExpanded = !node.isExpanded
+                    displayNodes = flatten(rootNodes)
+                },
+                isLight = isLight
+            )
         }
     }
 }
 
-private fun buildJsonTree(element: JsonElement, key: String?, depth: Int, isLast: Boolean): JsonNode {
+private fun buildJsonTree(
+    element: JsonElement,
+    key: String?,
+    depth: Int,
+    isLast: Boolean
+): JsonNode {
     val isExpanded = depth < 4
     if (element.isJsonObject) {
         val obj = element.asJsonObject
-        if (obj.size() == 0) return JsonNode(key = key, value = "{}", isExpandable = false, isExpanded = false, depth = depth, type = NodeType.EMPTY_OBJECT, isLastItemInParent = isLast)
+        if (obj.size() == 0) return JsonNode(
+            key = key,
+            value = "{}",
+            isExpandable = false,
+            isExpanded = false,
+            depth = depth,
+            type = NodeType.EMPTY_OBJECT,
+            isLastItemInParent = isLast
+        )
         val children = mutableListOf<JsonNode>()
         val entries = obj.entrySet().toList()
         for (i in entries.indices) {
-            children.add(buildJsonTree(entries[i].value, entries[i].key, depth + 1, i == entries.size - 1))
+            children.add(
+                buildJsonTree(
+                    entries[i].value,
+                    entries[i].key,
+                    depth + 1,
+                    i == entries.size - 1
+                )
+            )
         }
-        return JsonNode(key = key, value = "{", isExpandable = true, isExpanded = isExpanded, depth = depth, children = children, type = NodeType.OBJECT_START, isLastItemInParent = isLast)
+        return JsonNode(
+            key = key,
+            value = "{",
+            isExpandable = true,
+            isExpanded = isExpanded,
+            depth = depth,
+            children = children,
+            type = NodeType.OBJECT_START,
+            isLastItemInParent = isLast
+        )
     } else if (element.isJsonArray) {
         val arr = element.asJsonArray
-        if (arr.size() == 0) return JsonNode(key = key, value = "[]", isExpandable = false, isExpanded = false, depth = depth, type = NodeType.EMPTY_ARRAY, isLastItemInParent = isLast)
+        if (arr.size() == 0) return JsonNode(
+            key = key,
+            value = "[]",
+            isExpandable = false,
+            isExpanded = false,
+            depth = depth,
+            type = NodeType.EMPTY_ARRAY,
+            isLastItemInParent = isLast
+        )
         val children = mutableListOf<JsonNode>()
         for (i in 0 until arr.size()) {
             children.add(buildJsonTree(arr[i], null, depth + 1, i == arr.size() - 1))
         }
-        return JsonNode(key = key, value = "[", isExpandable = true, isExpanded = isExpanded, depth = depth, children = children, type = NodeType.ARRAY_START, isLastItemInParent = isLast)
+        return JsonNode(
+            key = key,
+            value = "[",
+            isExpandable = true,
+            isExpanded = isExpanded,
+            depth = depth,
+            children = children,
+            type = NodeType.ARRAY_START,
+            isLastItemInParent = isLast
+        )
     } else if (element.isJsonNull) {
-        return JsonNode(key = key, value = "null", isExpandable = false, isExpanded = false, depth = depth, type = NodeType.NULL, isLastItemInParent = isLast)
+        return JsonNode(
+            key = key,
+            value = "null",
+            isExpandable = false,
+            isExpanded = false,
+            depth = depth,
+            type = NodeType.NULL,
+            isLastItemInParent = isLast
+        )
     } else {
         val prim = element.asJsonPrimitive
-        val type = if (prim.isBoolean) NodeType.BOOLEAN else if (prim.isNumber) NodeType.NUMBER else NodeType.STRING
+        val type =
+            if (prim.isBoolean) NodeType.BOOLEAN else if (prim.isNumber) NodeType.NUMBER else NodeType.STRING
         val value = if (prim.isString) "\"${prim.asString}\"" else prim.asString
-        return JsonNode(key = key, value = value, isExpandable = false, isExpanded = false, depth = depth, type = type, isLastItemInParent = isLast)
+        return JsonNode(
+            key = key,
+            value = value,
+            isExpandable = false,
+            isExpanded = false,
+            depth = depth,
+            type = type,
+            isLastItemInParent = isLast
+        )
     }
 }
 
@@ -101,7 +186,14 @@ private fun flatten(nodes: List<JsonNode>): List<JsonNode> {
         if (node.isExpandable && node.isExpanded) {
             result.addAll(flatten(node.children))
             val endValue = if (node.type == NodeType.OBJECT_START) "}" else "]"
-            val endNode = JsonNode(key = null, value = endValue + if (!node.isLastItemInParent) "," else "", isExpandable = false, isExpanded = false, depth = node.depth, type = if (node.type == NodeType.OBJECT_START) NodeType.OBJECT_END else NodeType.ARRAY_END)
+            val endNode = JsonNode(
+                key = null,
+                value = endValue + if (!node.isLastItemInParent) "," else "",
+                isExpandable = false,
+                isExpanded = false,
+                depth = node.depth,
+                type = if (node.type == NodeType.OBJECT_START) NodeType.OBJECT_END else NodeType.ARRAY_END
+            )
             result.add(endNode)
         }
     }
@@ -109,7 +201,7 @@ private fun flatten(nodes: List<JsonNode>): List<JsonNode> {
 }
 
 @Composable
-private fun JsonNodeRow(node: JsonNode, onToggle: () -> Unit) {
+private fun JsonNodeRow(isLight: Boolean = false, node: JsonNode, onToggle: () -> Unit) {
     Row(
         modifier = Modifier
             .fillMaxWidth()
@@ -121,7 +213,9 @@ private fun JsonNodeRow(node: JsonNode, onToggle: () -> Unit) {
             Text(
                 text = if (node.isExpanded) "▼" else "▶",
                 fontSize = 10.sp,
-                modifier = Modifier.padding(end = 4.dp).width(12.dp),
+                modifier = Modifier
+                    .padding(end = 4.dp)
+                    .width(12.dp),
                 color = MaterialTheme.colorScheme.onBackground
             )
         } else {
@@ -129,7 +223,12 @@ private fun JsonNodeRow(node: JsonNode, onToggle: () -> Unit) {
         }
 
         if (node.key != null) {
-            Text(text = "\"${node.key}\": ", fontFamily = FontFamily.Monospace, fontSize = 12.sp, color = MaterialTheme.colorScheme.onBackground)
+            Text(
+                text = "\"${node.key}\": ",
+                fontFamily = FontFamily.Monospace,
+                fontSize = 12.sp,
+                color = if (isLight) MaterialTheme.colorScheme.onBackground else MaterialTheme.colorScheme.background
+            )
         }
 
         val displayValue = if (node.isExpandable && !node.isExpanded) {
@@ -147,7 +246,12 @@ private fun JsonNodeRow(node: JsonNode, onToggle: () -> Unit) {
             else -> MaterialTheme.colorScheme.onBackground
         }
 
-        Text(text = displayValue, fontFamily = FontFamily.Monospace, fontSize = 12.sp, color = color)
+        Text(
+            text = displayValue,
+            fontFamily = FontFamily.Monospace,
+            fontSize = 12.sp,
+            color = color
+        )
     }
 }
 

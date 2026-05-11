@@ -11,6 +11,7 @@ import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxHeight
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
@@ -300,9 +301,13 @@ internal fun JsonSection(
                 .clip(RoundedCornerShape(4.dp))
                 .background(NetloggerDetailColors.DarkBg)
                 .padding(8.dp)
-                .heightIn(max = 400.dp)
+                .heightIn(max = 500.dp)
         ) {
-            JsonViewer(jsonString = jsonString, modifier = Modifier.fillMaxWidth())
+            JsonViewer(
+                jsonString = jsonString, modifier = Modifier
+                    .fillMaxWidth()
+                    .fillMaxSize()
+            )
         }
     }
 }
@@ -340,17 +345,19 @@ internal fun ExpandableHeadersSection(title: String, headers: String?) {
             }
 
             AnimatedVisibility(visible = expanded) {
-                Column(modifier = Modifier.padding(top = 12.dp)) {
+                Column(
+                    modifier = Modifier
+                        .padding(top = 12.dp)
+                ) {
                     if (headers.isNullOrBlank()) {
                         Text("No headers", fontSize = 13.sp, color = NetloggerDetailColors.Label)
                     } else {
-                        // Simple header list parsing (assuming JSON or key-value)
-                        // For now just show as raw text if not JSON
-                        Text(
-                            text = headers,
-                            fontSize = 12.sp,
-                            fontFamily = FontFamily.Monospace,
-                            color = NetloggerDetailColors.Text
+                        JsonViewer(
+                            jsonString = headers,
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .heightIn(max = 300.dp),
+                            isLight = true
                         )
                     }
                 }
