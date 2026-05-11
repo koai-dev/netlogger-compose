@@ -15,4 +15,6 @@
     <color name="netlogger_json_number">#B5CEA8</color>
     <color name="netlogger_json_boolean">#569CD6</color>
     <color name="netlogger_json_null">#569CD6</color>
+
+    <style name="Theme.Netlogger" parent="android:Theme.Material.Light.NoActionBar" />
 </resources>

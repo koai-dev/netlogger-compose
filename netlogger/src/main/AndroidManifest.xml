@@ -4,6 +4,7 @@
     <application>
         <activity
             android:name=".presentation.ui.NetloggerActivity"
+            android:theme="@style/Theme.Netlogger"
             android:exported="false" />
     </application>
 </manifest>
