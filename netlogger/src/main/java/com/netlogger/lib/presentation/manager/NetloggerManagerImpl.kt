@@ -1,6 +1,6 @@
 package com.netlogger.lib.presentation.manager
 
-import com.netlogger.lib.domain.model.LogLevel
+import com.netlogger.lib.domain.model.LogSeverity
 import com.netlogger.lib.domain.usecase.SaveGeneralLogUseCase
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -15,7 +15,7 @@ class NetloggerManagerImpl(
     
     private val scope = CoroutineScope(Dispatchers.IO + SupervisorJob())
 
-    override fun log(tag: String, message: String, level: LogLevel) {
+    override fun log(tag: String, message: String, level: LogSeverity) {
         scope.launch {
             saveGeneralLogUseCase(tag, message, level)
         }

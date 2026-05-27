@@ -27,10 +27,22 @@ import com.netlogger.lib.presentation.model.JsonNode
 import com.netlogger.lib.presentation.model.NodeType
 import kotlinx.coroutines.launch
 
-val ColorJsonString = Color(0xFF008000)
-val ColorJsonNumber = Color(0xFF0000FF)
-val ColorJsonBoolean = Color(0xFFB22222)
-val ColorJsonNull = Color(0xFF808080)
+// Colors for Light Mode (isLight = true)
+val ColorJsonKeyLight = Color(0xFF0F172A)
+val ColorJsonStringLight = Color(0xFF0F766E)
+val ColorJsonNumberLight = Color(0xFF1D4ED8)
+val ColorJsonBooleanLight = Color(0xFFB91C1C)
+val ColorJsonNullLight = Color(0xFF64748B)
+val ColorJsonDefaultLight = Color(0xFF1E293B)
+
+// Colors for Dark Mode (isLight = false)
+val ColorJsonKeyDark = Color(0xFFF8FAFC)
+val ColorJsonStringDark = Color(0xFF34D399)
+val ColorJsonNumberDark = Color(0xFF38BDF8)
+val ColorJsonBooleanDark = Color(0xFFF87171)
+val ColorJsonNullDark = Color(0xFF94A3B8)
+val ColorJsonDefaultDark = Color(0xFFE2E8F0)
+
 val ColorSearchHighlight = Color(0xFFFFEB3B)
 val ColorSearchCurrentHighlight = Color(0xFFFF9800)
 
@@ -250,6 +262,8 @@ private fun JsonNodeRow(
     isCurrentMatch: Boolean = false
 ) {
     val backgroundColor = if (isCurrentMatch) ColorSearchCurrentHighlight else Color.Transparent
+    val defaultColor = if (isLight) ColorJsonDefaultLight else ColorJsonDefaultDark
+    val keyColor = if (isLight) ColorJsonKeyLight else ColorJsonKeyDark
 
     Row(
         modifier = Modifier
@@ -266,7 +280,7 @@ private fun JsonNodeRow(
                 modifier = Modifier
                     .padding(end = 4.dp)
                     .width(12.dp),
-                color = MaterialTheme.colorScheme.onBackground
+                color = defaultColor
             )
         } else {
             Spacer(modifier = Modifier.width(16.dp))
@@ -275,7 +289,7 @@ private fun JsonNodeRow(
         if (node.key != null) {
             val keyText = "\"${node.key}\": "
             Text(
-                text = highlightText(keyText, searchQuery, if (isLight) MaterialTheme.colorScheme.onBackground else MaterialTheme.colorScheme.background),
+                text = highlightText(keyText, searchQuery, keyColor),
                 fontFamily = FontFamily.Monospace,
                 fontSize = 12.sp
             )
@@ -289,11 +303,11 @@ private fun JsonNodeRow(
         }
 
         val color = when (node.type) {
-            NodeType.STRING -> ColorJsonString
-            NodeType.NUMBER -> ColorJsonNumber
-            NodeType.BOOLEAN -> ColorJsonBoolean
-            NodeType.NULL -> ColorJsonNull
-            else -> MaterialTheme.colorScheme.onBackground
+            NodeType.STRING -> if (isLight) ColorJsonStringLight else ColorJsonStringDark
+            NodeType.NUMBER -> if (isLight) ColorJsonNumberLight else ColorJsonNumberDark
+            NodeType.BOOLEAN -> if (isLight) ColorJsonBooleanLight else ColorJsonBooleanDark
+            NodeType.NULL -> if (isLight) ColorJsonNullLight else ColorJsonNullDark
+            else -> defaultColor
         }
 
         Text(

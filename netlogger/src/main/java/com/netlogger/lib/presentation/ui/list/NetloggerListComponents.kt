@@ -41,7 +41,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.netlogger.lib.R
 import com.netlogger.lib.domain.model.LogEntry
-import com.netlogger.lib.domain.model.LogLevel
+import com.netlogger.lib.domain.model.LogSeverity
 import com.netlogger.lib.presentation.ui.components.NetloggerIconButton
 import java.text.SimpleDateFormat
 import java.util.Date
@@ -299,7 +299,7 @@ private fun LogMainText(log: LogEntry, modifier: Modifier = Modifier) {
 
 private fun LogEntry.badgeText() = when (this) {
     is LogEntry.Api -> if (statusCode in 200..299) "200\nOK" else "$statusCode\nERR"
-    is LogEntry.General -> if (level == LogLevel.ERROR) "ERROR" else level.name
+    is LogEntry.General -> if (level == LogSeverity.ERROR) "ERROR" else level.name
 }
 
 private fun LogEntry.leadingText() = when (this) {
@@ -314,7 +314,7 @@ private fun LogEntry.bodyText() = when (this) {
 
 private fun LogEntry.isErrorLog() = when (this) {
     is LogEntry.Api -> statusCode !in 200..299
-    is LogEntry.General -> level == LogLevel.ERROR
+    is LogEntry.General -> level == LogSeverity.ERROR
 }
 
 @Composable

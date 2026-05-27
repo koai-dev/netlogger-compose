@@ -94,7 +94,7 @@ object Netlogger {
         getSettingsUseCase = GetSettingsUseCase(settingsRepository)
         saveSettingsUseCase = SaveSettingsUseCase(settingsRepository)
 
-        val interceptor = NetloggerInterceptor(saveApiLogUseCase)
+        val interceptor = NetloggerInterceptor(saveApiLogUseCase, getSettingsUseCase)
         netloggerManager = NetloggerManagerImpl(saveGeneralLogUseCase, interceptor)
     }
 

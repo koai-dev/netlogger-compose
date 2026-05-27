@@ -2,6 +2,7 @@ package com.netlogger.lib.data.repository
 
 import android.content.Context
 import android.content.SharedPreferences
+import com.netlogger.lib.domain.model.LogLevel
 import com.netlogger.lib.domain.model.LogSettings
 import com.netlogger.lib.domain.repository.SettingsRepository
 import kotlinx.coroutines.channels.awaitClose
@@ -27,15 +28,23 @@ class SettingsRepositoryImpl(private val context: Context) : SettingsRepository 
             putBoolean("auto_reset", settings.autoResetOnStart)
             putBoolean("enable_shake", settings.enableShakeDetector)
             putFloat("shake_sensitivity", settings.shakeSensitivity)
+            putString("log_level", settings.logLevel.name)
             apply()
         }
     }
 
     private fun readSettings(): LogSettings {
+        val logLevelName = prefs.getString("log_level", LogLevel.ALL.name) ?: LogLevel.ALL.name
+        val logLevel = try {
+            LogLevel.valueOf(logLevelName)
+        } catch (e: Exception) {
+            LogLevel.ALL
+        }
         return LogSettings(
             autoResetOnStart = prefs.getBoolean("auto_reset", false),
             enableShakeDetector = prefs.getBoolean("enable_shake", true),
-            shakeSensitivity = prefs.getFloat("shake_sensitivity", 2.0f)
+            shakeSensitivity = prefs.getFloat("shake_sensitivity", 2.0f),
+            logLevel = logLevel
         )
     }
 }

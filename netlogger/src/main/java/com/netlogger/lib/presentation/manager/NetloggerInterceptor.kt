@@ -2,8 +2,11 @@ package com.netlogger.lib.presentation.manager
 
 import com.google.gson.JsonObject
 import com.netlogger.lib.domain.model.LogEntry
+import com.netlogger.lib.domain.model.LogLevel
+import com.netlogger.lib.domain.usecase.GetSettingsUseCase
 import com.netlogger.lib.domain.usecase.SaveApiLogUseCase
 import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.flow.collect
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.launch
@@ -14,19 +17,36 @@ import okio.Buffer
 import java.nio.charset.Charset
 
 class NetloggerInterceptor(
-    private val saveApiLogUseCase: SaveApiLogUseCase
+    private val saveApiLogUseCase: SaveApiLogUseCase,
+    private val getSettingsUseCase: GetSettingsUseCase
 ) : Interceptor {
     private val scope = CoroutineScope(Dispatchers.IO + SupervisorJob())
     private val utf8 = Charset.forName("UTF-8")
 
+    @Volatile
+    private var currentLogLevel: LogLevel = LogLevel.ALL
+
+    init {
+        scope.launch {
+            getSettingsUseCase().collect { settings ->
+                currentLogLevel = settings.logLevel
+            }
+        }
+    }
+
     override fun intercept(chain: Interceptor.Chain): Response {
+        val level = currentLogLevel
+        if (!level.info) {
+            return chain.proceed(chain.request())
+        }
+
         val request = chain.request()
         val requestTime = System.currentTimeMillis()
 
         // Read request body
         var requestBodyString: String? = null
         val requestBody = request.body
-        if (requestBody != null) {
+        if (level.body && requestBody != null) {
             try {
                 val buffer = Buffer()
                 requestBody.writeTo(buffer)
@@ -43,7 +63,9 @@ class NetloggerInterceptor(
             val endTime = System.currentTimeMillis()
             // On error, we only have the original request headers (pre-chain).
             // Build them as JSON for consistent parsing downstream.
-            val headersJson = buildAllHeadersJson(request)
+            val headersJson = if (level.headers) buildAllHeadersJson(request) else null
+            val bodyJson = if (level.body) requestBodyString else null
+            val errorBody = if (level.body) (e.message ?: e.toString()) else null
             scope.launch {
                 saveApiLogUseCase(
                     LogEntry.Api(
@@ -51,9 +73,9 @@ class NetloggerInterceptor(
                         method = request.method,
                         url = request.url.toString(),
                         requestHeaders = headersJson,
-                        requestBody = requestBodyString,
+                        requestBody = bodyJson,
                         responseHeaders = null,
-                        responseBody = e.message ?: e.toString(),
+                        responseBody = errorBody,
                         statusCode = 0,
                         requestTime = requestTime,
                         responseTime = endTime,
@@ -68,7 +90,7 @@ class NetloggerInterceptor(
         val responseBody = response.body
         var responseBodyString: String? = null
 
-        if (responseBody.contentLength() != 0L) {
+        if (level.body && responseBody.contentLength() != 0L) {
             try {
                 val source = responseBody.source()
                 source.request(Long.MAX_VALUE) // Buffer the entire body.
@@ -83,7 +105,8 @@ class NetloggerInterceptor(
         // This includes all headers added by other interceptors in the chain
         // (e.g. AuthenticationInterceptor, BridgeInterceptor, etc.).
         val sentRequest = response.request
-        val sentHeadersJson = buildAllHeadersJson(sentRequest)
+        val sentHeadersJson = if (level.headers) buildAllHeadersJson(sentRequest) else null
+        val responseHeadersJson = if (level.headers) buildResponseHeadersJson(response) else null
 
         scope.launch {
             saveApiLogUseCase(
@@ -93,7 +116,7 @@ class NetloggerInterceptor(
                     url = sentRequest.url.toString(),
                     requestHeaders = sentHeadersJson,
                     requestBody = requestBodyString,
-                    responseHeaders = buildResponseHeadersJson(response),
+                    responseHeaders = responseHeadersJson,
                     responseBody = responseBodyString,
                     statusCode = response.code,
                     requestTime = requestTime,

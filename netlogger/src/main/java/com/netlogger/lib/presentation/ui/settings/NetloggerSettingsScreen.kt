@@ -20,7 +20,9 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.compose.foundation.clickable
 import com.netlogger.lib.R
+import com.netlogger.lib.domain.model.LogLevel
 import com.netlogger.lib.domain.model.LogSettings
 import com.netlogger.lib.presentation.ui.detail.NetloggerDetailColors
 
@@ -56,7 +58,8 @@ fun NetloggerSettingsScreen(
             paddingValues = paddingValues,
             onAutoResetChange = { viewModel.updateAutoReset(it) },
             onShakeDetectorChange = { viewModel.updateShakeDetector(it) },
-            onShakeSensitivityChange = { viewModel.updateShakeSensitivity(it) }
+            onShakeSensitivityChange = { viewModel.updateShakeSensitivity(it) },
+            onLogLevelChange = { viewModel.updateLogLevel(it) }
         )
     }
 }
@@ -67,7 +70,8 @@ private fun NetloggerSettingsContent(
     paddingValues: PaddingValues,
     onAutoResetChange: (Boolean) -> Unit,
     onShakeDetectorChange: (Boolean) -> Unit,
-    onShakeSensitivityChange: (Float) -> Unit
+    onShakeSensitivityChange: (Float) -> Unit,
+    onLogLevelChange: (LogLevel) -> Unit
 ) {
     Column(
         modifier = Modifier
@@ -84,6 +88,11 @@ private fun NetloggerSettingsContent(
                 subtitle = "Clear all logs when app starts",
                 checked = settings.autoResetOnStart,
                 onCheckedChange = onAutoResetChange
+            )
+            HorizontalDivider(modifier = Modifier.padding(vertical = 12.dp), thickness = 0.5.dp)
+            SettingLogLevelItem(
+                selectedLevel = settings.logLevel,
+                onLevelChange = onLogLevelChange
             )
         }
 
@@ -226,6 +235,77 @@ private fun SettingToggleItem(
     }
 }
 
+@Composable
+private fun SettingLogLevelItem(
+    selectedLevel: LogLevel,
+    onLevelChange: (LogLevel) -> Unit
+) {
+    var expanded by remember { mutableStateOf(false) }
+
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clickable { expanded = true }
+            .padding(vertical = 4.dp),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Column(modifier = Modifier.weight(1f)) {
+            Text(text = "API Log Level", fontSize = 15.sp, fontWeight = FontWeight.Medium)
+            Text(
+                text = "Control how much API data is captured (${selectedLevel.name})",
+                fontSize = 13.sp,
+                color = Color.Gray
+            )
+        }
+        
+        Box {
+            Button(
+                onClick = { expanded = true },
+                colors = ButtonDefaults.buttonColors(
+                    containerColor = NetloggerDetailColors.Teal,
+                    contentColor = Color.White
+                ),
+                contentPadding = PaddingValues(horizontal = 12.dp, vertical = 6.dp),
+                shape = RoundedCornerShape(4.dp)
+            ) {
+                Text(selectedLevel.name, fontSize = 12.sp, fontWeight = FontWeight.Bold)
+            }
+
+            DropdownMenu(
+                expanded = expanded,
+                onDismissRequest = { expanded = false },
+                modifier = Modifier.background(Color.White)
+            ) {
+                LogLevel.values().forEach { level ->
+                    DropdownMenuItem(
+                        text = {
+                            Column {
+                                Text(
+                                    text = level.name,
+                                    fontWeight = if (level == selectedLevel) FontWeight.Bold else FontWeight.Normal,
+                                    color = if (level == selectedLevel) NetloggerDetailColors.Teal else Color.Unspecified
+                                )
+                                val details = when (level) {
+                                    LogLevel.ALL -> "Log info, headers and body"
+                                    LogLevel.HEADERS -> "Log info and headers only"
+                                    LogLevel.BODY -> "Log info and body only"
+                                    LogLevel.INFO -> "Log info only (no headers or body)"
+                                    LogLevel.NONE -> "Disable API logging completely"
+                                }
+                                Text(text = details, fontSize = 11.sp, color = Color.Gray)
+                            }
+                        },
+                        onClick = {
+                            onLevelChange(level)
+                            expanded = false
+                        }
+                    )
+                }
+            }
+        }
+    }
+}
+
 @OptIn(ExperimentalMaterial3Api::class)
 @androidx.compose.ui.tooling.preview.Preview(showBackground = true)
 @Composable
@@ -254,7 +334,8 @@ fun NetloggerSettingsPreview() {
                 paddingValues = paddingValues,
                 onAutoResetChange = {},
                 onShakeDetectorChange = {},
-                onShakeSensitivityChange = {}
+                onShakeSensitivityChange = {},
+                onLogLevelChange = {}
             )
         }
     }

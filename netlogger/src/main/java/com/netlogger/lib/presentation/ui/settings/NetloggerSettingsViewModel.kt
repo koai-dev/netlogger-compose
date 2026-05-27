@@ -2,6 +2,7 @@ package com.netlogger.lib.presentation.ui.settings
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.netlogger.lib.domain.model.LogLevel
 import com.netlogger.lib.domain.model.LogSettings
 import com.netlogger.lib.domain.usecase.GetSettingsUseCase
 import com.netlogger.lib.domain.usecase.SaveSettingsUseCase
@@ -33,6 +34,12 @@ class NetloggerSettingsViewModel(
     fun updateShakeSensitivity(sensitivity: Float) {
         viewModelScope.launch {
             saveSettingsUseCase(settings.value.copy(shakeSensitivity = sensitivity))
+        }
+    }
+
+    fun updateLogLevel(level: LogLevel) {
+        viewModelScope.launch {
+            saveSettingsUseCase(settings.value.copy(logLevel = level))
         }
     }
 }

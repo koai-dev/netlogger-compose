@@ -1,6 +1,6 @@
 package com.netlogger.lib.domain.model
 
-import com.netlogger.lib.domain.model.LogLevel
+import com.netlogger.lib.domain.model.LogSeverity
 import com.netlogger.lib.domain.model.LogType
 
 sealed class LogEntry {
@@ -14,7 +14,7 @@ sealed class LogEntry {
         override val timestamp: Long = System.currentTimeMillis(),
         override val tag: String,
         val message: String,
-        val level: LogLevel = LogLevel.INFO
+        val level: LogSeverity = LogSeverity.INFO
     ) : LogEntry() {
         override val type: LogType = LogType.GENERAL
     }

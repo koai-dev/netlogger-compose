@@ -2,7 +2,7 @@ package com.netlogger.lib.data.mapper
 
 import com.netlogger.lib.data.source.local.entity.LogEntity
 import com.netlogger.lib.domain.model.LogEntry
-import com.netlogger.lib.domain.model.LogLevel
+import com.netlogger.lib.domain.model.LogSeverity
 import com.netlogger.lib.domain.model.LogType
 
 fun LogEntry.toEntity(): LogEntity {
@@ -47,7 +47,7 @@ fun LogEntity.toDomain(): LogEntry {
             timestamp = timestamp,
             tag = tag,
             message = message ?: "",
-            level = LogLevel.valueOf(level ?: LogLevel.INFO.name)
+            level = LogSeverity.valueOf(level ?: LogSeverity.INFO.name)
         )
     } else {
         LogEntry.Api(

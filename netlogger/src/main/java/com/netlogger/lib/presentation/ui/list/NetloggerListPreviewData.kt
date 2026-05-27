@@ -1,7 +1,7 @@
 package com.netlogger.lib.presentation.ui.list
 
 import com.netlogger.lib.domain.model.LogEntry
-import com.netlogger.lib.domain.model.LogLevel
+import com.netlogger.lib.domain.model.LogSeverity
 
 internal enum class NetloggerFilter(val title: String, val queryValue: String?) {
     ALL("All", "ALL"),
@@ -18,7 +18,7 @@ internal fun sampleLogListItems(): List<LogListItem> = listOf(
         LogEntry.General(
             tag = "AuthModule",
             message = "User session validated successfully",
-            level = LogLevel.DEBUG,
+            level = LogSeverity.DEBUG,
             timestamp = System.currentTimeMillis() - 70_000
         )
     ),
@@ -26,7 +26,7 @@ internal fun sampleLogListItems(): List<LogListItem> = listOf(
         LogEntry.General(
             tag = "Database",
             message = "Failed to fetch user profile",
-            level = LogLevel.ERROR,
+            level = LogSeverity.ERROR,
             timestamp = System.currentTimeMillis() - 130_000
         )
     ),
