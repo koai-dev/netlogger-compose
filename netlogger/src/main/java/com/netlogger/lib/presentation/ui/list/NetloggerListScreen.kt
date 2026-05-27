@@ -38,7 +38,8 @@ fun NetloggerListScreen(
         onFilterClick = { showFilterSheet = true },
         onClearLogs = viewModel::clearLogs,
         onSearch = viewModel::search,
-        onFilterSelected = viewModel::filterByType
+        onFilterSelected = viewModel::filterByType,
+        onClose = onClose
     )
 
     if (showFilterSheet) {
@@ -62,7 +63,8 @@ internal fun NetloggerListContent(
     onFilterClick: () -> Unit = {},
     onClearLogs: () -> Unit = {},
     onSearch: (String) -> Unit = {},
-    onFilterSelected: (String?) -> Unit = {}
+    onFilterSelected: (String?) -> Unit = {},
+    onClose: () -> Unit = {}
 ) {
     var searchQuery by remember { mutableStateOf("") }
     var selectedFilter by remember { mutableStateOf(NetloggerFilter.ALL) }
@@ -72,7 +74,8 @@ internal fun NetloggerListContent(
         topBar = {
             NetloggerHeader(
                 onClearLogs = onClearLogs,
-                onSettingsClick = onSettingsClick
+                onSettingsClick = onSettingsClick,
+                onClose = onClose
             )
         },
         containerColor = NetloggerListColors.Screen

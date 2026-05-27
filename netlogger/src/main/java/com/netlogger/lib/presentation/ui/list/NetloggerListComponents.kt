@@ -65,7 +65,11 @@ internal object NetloggerListColors {
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-internal fun NetloggerHeader(onClearLogs: () -> Unit, onSettingsClick: () -> Unit) {
+internal fun NetloggerHeader(
+    onClearLogs: () -> Unit,
+    onSettingsClick: () -> Unit,
+    onClose: () -> Unit = {}
+) {
     Column {
         TopAppBar(
             title = {
@@ -101,6 +105,12 @@ internal fun NetloggerHeader(onClearLogs: () -> Unit, onSettingsClick: () -> Uni
                         colorFilter = NetloggerListColors.Gear,
                         onClick = onSettingsClick
                     )
+                    NetloggerIconButton(
+                        icon = R.drawable.ic_close,
+                        colorFilter = NetloggerListColors.Gear,
+                        onClick = onClose
+                    )
+
                 }
             },
             colors = TopAppBarDefaults.topAppBarColors().copy(
