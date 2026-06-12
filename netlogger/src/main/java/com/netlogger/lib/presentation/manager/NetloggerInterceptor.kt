@@ -58,34 +58,34 @@ class NetloggerInterceptor(
         }
 
         // Print request to console
-        Log.d("Netlogger", "--> ${request.method} ${request.url}")
+        Log.w("Netlogger", "--> ${request.method} ${request.url}")
         if (level.headers) {
             val headers = request.headers
             for (i in 0 until headers.size) {
-                Log.d("Netlogger", "${headers.name(i)}: ${headers.value(i)}")
+                Log.w("Netlogger", "${headers.name(i)}: ${headers.value(i)}")
             }
             requestBody?.contentType()?.let {
-                Log.d("Netlogger", "Content-Type: $it")
+                Log.w("Netlogger", "Content-Type: $it")
             }
             try {
                 val len = requestBody?.contentLength() ?: -1
                 if (len >= 0) {
-                    Log.d("Netlogger", "Content-Length: $len")
+                    Log.w("Netlogger", "Content-Length: $len")
                 }
             } catch (_: Exception) {}
         }
         if (level.body && requestBodyString != null) {
-            Log.d("Netlogger", "")
-            Log.d("Netlogger", requestBodyString)
+            Log.w("Netlogger", "")
+            Log.w("Netlogger", requestBodyString)
         }
-        Log.d("Netlogger", "--> END ${request.method}")
+        Log.w("Netlogger", "--> END ${request.method}")
 
         var response: Response
         try {
             response = chain.proceed(request)
         } catch (e: Exception) {
             val endTime = System.currentTimeMillis()
-            Log.d("Netlogger", "<-- HTTP FAILED: $e")
+            Log.w("Netlogger", "<-- HTTP FAILED: $e")
             // On error, we only have the original request headers (pre-chain).
             // Build them as JSON for consistent parsing downstream.
             val headersJson = if (level.headers) buildAllHeadersJson(request) else null
@@ -135,18 +135,18 @@ class NetloggerInterceptor(
 
         // Print response to console
         val duration = responseTime - requestTime
-        Log.d("Netlogger", "<-- ${response.code} ${response.message} ${sentRequest.url} (${duration}ms)")
+        Log.w("Netlogger", "<-- ${response.code} ${response.message} ${sentRequest.url} (${duration}ms)")
         if (level.headers) {
             val headers = response.headers
             for (i in 0 until headers.size) {
-                Log.d("Netlogger", "${headers.name(i)}: ${headers.value(i)}")
+                Log.w("Netlogger", "${headers.name(i)}: ${headers.value(i)}")
             }
         }
         if (level.body && responseBodyString != null) {
-            Log.d("Netlogger", "")
-            Log.d("Netlogger", responseBodyString)
+            Log.w("Netlogger", "")
+            Log.w("Netlogger", responseBodyString)
         }
-        Log.d("Netlogger", "<-- END HTTP")
+        Log.w("Netlogger", "<-- END HTTP")
 
         scope.launch {
             saveApiLogUseCase(
