@@ -42,4 +42,10 @@ class NetloggerSettingsViewModel(
             saveSettingsUseCase(settings.value.copy(logLevel = level))
         }
     }
+
+    fun updateFloatingButton(enabled: Boolean) {
+        viewModelScope.launch {
+            saveSettingsUseCase(settings.value.copy(enableFloatingButton = enabled))
+        }
+    }
 }

@@ -46,6 +46,7 @@ object Netlogger {
     private val scope = CoroutineScope(Dispatchers.Main + Job())
     private var isShakeEnabled = true
     private var sensitivity = 2.7f
+    private var isFabEnabled = true
     private var hasAutoResetExecuted = false
 
     // Manual Dependency Injection Container
@@ -116,12 +117,23 @@ object Netlogger {
             sensitivity = settings.shakeSensitivity
             shakeDetector?.sensitivity = sensitivity
 
+            val fabChanged = isFabEnabled != settings.enableFloatingButton
+            isFabEnabled = settings.enableFloatingButton
+
             // Re-register listener if needed
             currentActivityRef?.get()?.let { activity ->
                 if (isShakeEnabled) {
                     registerShakeListener()
                 } else {
                     unregisterShakeListener()
+                }
+
+                if (fabChanged) {
+                    if (isFabEnabled) {
+                        showFloatingButton(activity)
+                    } else {
+                        hideFloatingButton(activity)
+                    }
                 }
             }
         }.launchIn(scope)
@@ -145,7 +157,9 @@ object Netlogger {
                 if (isShakeEnabled) {
                     registerShakeListener()
                 }
-                showFloatingButton(activity)
+                if (isFabEnabled) {
+                    showFloatingButton(activity)
+                }
             }
 
             override fun onActivityPaused(activity: Activity) {

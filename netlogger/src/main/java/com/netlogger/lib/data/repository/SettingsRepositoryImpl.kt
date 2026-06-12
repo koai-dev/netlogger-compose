@@ -2,6 +2,8 @@ package com.netlogger.lib.data.repository
 
 import android.content.Context
 import android.content.SharedPreferences
+import android.hardware.Sensor
+import android.hardware.SensorManager
 import com.netlogger.lib.domain.model.LogLevel
 import com.netlogger.lib.domain.model.LogSettings
 import com.netlogger.lib.domain.repository.SettingsRepository
@@ -29,6 +31,7 @@ class SettingsRepositoryImpl(private val context: Context) : SettingsRepository 
             putBoolean("enable_shake", settings.enableShakeDetector)
             putFloat("shake_sensitivity", settings.shakeSensitivity)
             putString("log_level", settings.logLevel.name)
+            putBoolean("enable_floating_button", settings.enableFloatingButton)
             apply()
         }
     }
@@ -40,11 +43,17 @@ class SettingsRepositoryImpl(private val context: Context) : SettingsRepository 
         } catch (e: Exception) {
             LogLevel.ALL
         }
+
+        val sensorManager = context.getSystemService(Context.SENSOR_SERVICE) as? SensorManager
+        val isShakeSupported = sensorManager?.getDefaultSensor(Sensor.TYPE_ACCELEROMETER) != null
+        val defaultShowFab = !isShakeSupported
+
         return LogSettings(
             autoResetOnStart = prefs.getBoolean("auto_reset", false),
             enableShakeDetector = prefs.getBoolean("enable_shake", true),
             shakeSensitivity = prefs.getFloat("shake_sensitivity", 2.0f),
-            logLevel = logLevel
+            logLevel = logLevel,
+            enableFloatingButton = prefs.getBoolean("enable_floating_button", defaultShowFab)
         )
     }
 }

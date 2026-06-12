@@ -4,5 +4,6 @@ data class LogSettings(
     val autoResetOnStart: Boolean = false,
     val enableShakeDetector: Boolean = true,
     val shakeSensitivity: Float = 2.0f,
-    val logLevel: LogLevel = LogLevel.ALL
+    val logLevel: LogLevel = LogLevel.ALL,
+    val enableFloatingButton: Boolean = true
 )

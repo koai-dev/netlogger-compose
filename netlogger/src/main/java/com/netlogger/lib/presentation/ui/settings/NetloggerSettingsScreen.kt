@@ -59,7 +59,8 @@ fun NetloggerSettingsScreen(
             onAutoResetChange = { viewModel.updateAutoReset(it) },
             onShakeDetectorChange = { viewModel.updateShakeDetector(it) },
             onShakeSensitivityChange = { viewModel.updateShakeSensitivity(it) },
-            onLogLevelChange = { viewModel.updateLogLevel(it) }
+            onLogLevelChange = { viewModel.updateLogLevel(it) },
+            onFloatingButtonChange = { viewModel.updateFloatingButton(it) }
         )
     }
 }
@@ -71,7 +72,8 @@ private fun NetloggerSettingsContent(
     onAutoResetChange: (Boolean) -> Unit,
     onShakeDetectorChange: (Boolean) -> Unit,
     onShakeSensitivityChange: (Float) -> Unit,
-    onLogLevelChange: (LogLevel) -> Unit
+    onLogLevelChange: (LogLevel) -> Unit,
+    onFloatingButtonChange: (Boolean) -> Unit
 ) {
     Column(
         modifier = Modifier
@@ -147,6 +149,13 @@ private fun NetloggerSettingsContent(
                     }
                 }
             }
+            HorizontalDivider(modifier = Modifier.padding(vertical = 12.dp), thickness = 0.5.dp)
+            SettingToggleItem(
+                title = "Show Floating Button",
+                subtitle = "Display floating shortcut button to open logger",
+                checked = settings.enableFloatingButton,
+                onCheckedChange = onFloatingButtonChange
+            )
         }
 
         // About
@@ -329,13 +338,15 @@ fun NetloggerSettingsPreview() {
                 settings = LogSettings(
                     autoResetOnStart = true,
                     enableShakeDetector = true,
-                    shakeSensitivity = 2.7f
+                    shakeSensitivity = 2.7f,
+                    enableFloatingButton = true
                 ),
                 paddingValues = paddingValues,
                 onAutoResetChange = {},
                 onShakeDetectorChange = {},
                 onShakeSensitivityChange = {},
-                onLogLevelChange = {}
+                onLogLevelChange = {},
+                onFloatingButtonChange = {}
             )
         }
     }
