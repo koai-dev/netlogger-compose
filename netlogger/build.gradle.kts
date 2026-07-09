@@ -40,7 +40,7 @@ android {
         }
     }
 }
-val libVersion = "1.3.1"
+val libVersion = "1.3.2"
 afterEvaluate {
     publishing {
         publications {
