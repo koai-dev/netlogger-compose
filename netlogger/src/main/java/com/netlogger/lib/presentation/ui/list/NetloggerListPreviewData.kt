@@ -12,8 +12,24 @@ internal enum class NetloggerFilter(val title: String, val queryValue: String?) 
 
 internal fun sampleLogListItems(): List<LogListItem> = listOf(
     LogListItem.DateHeader("Today"),
-    LogListItem.LogItem(sampleApiLog(statusCode = 200, method = "GET", url = "https://api.github.com", duration = 120, offset = 0)),
-    LogListItem.LogItem(sampleApiLog(statusCode = 404, method = "POST", url = "https://api.example.com", duration = 85, offset = 53_000)),
+    LogListItem.LogItem(
+        sampleApiLog(
+            statusCode = 200,
+            method = "GET",
+            url = "https://api.github.com/mobile/v1/accounts/current/profile/settings?expand=permissions,teams&locale=vi_VN",
+            duration = 120,
+            offset = 0
+        )
+    ),
+    LogListItem.LogItem(
+        sampleApiLog(
+            statusCode = 404,
+            method = "POST",
+            url = "https://api.example.com/auth/session/refresh/token",
+            duration = 85,
+            offset = 53_000
+        )
+    ),
     LogListItem.LogItem(
         LogEntry.General(
             tag = "AuthModule",
@@ -31,7 +47,15 @@ internal fun sampleLogListItems(): List<LogListItem> = listOf(
         )
     ),
     LogListItem.DateHeader("Yesterday"),
-    LogListItem.LogItem(sampleApiLog(statusCode = 200, method = "GET", url = "https://api.weather.com", duration = 210, offset = 86_400_000))
+    LogListItem.LogItem(
+        sampleApiLog(
+            statusCode = 200,
+            method = "GET",
+            url = "https://api.weather.com/v3/weather/forecast/daily/10day",
+            duration = 210,
+            offset = 86_400_000
+        )
+    )
 )
 
 private fun sampleApiLog(statusCode: Int, method: String, url: String, duration: Long, offset: Long) = LogEntry.Api(

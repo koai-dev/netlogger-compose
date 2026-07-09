@@ -1,11 +1,13 @@
 package com.netlogger.lib.presentation.ui.list
 
+import android.net.Uri
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Row
@@ -31,9 +33,11 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.rememberTextMeasurer
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.tooling.preview.Preview
@@ -61,6 +65,12 @@ internal object NetloggerListColors {
     val GreenText = Color(0xFF067A3A)
     val RedBg = Color(0xFFFFF0F0)
     val RedBorder = Color(0xFFFFC8C8)
+    val ErrorText = Color(0xFF9B1117)
+    val BlueBg = Color(0xFFEAF2FF)
+    val BlueBorder = Color(0xFFC7DBFF)
+    val BlueText = Color(0xFF244EBC)
+    val SurfaceSoft = Color(0xFFF8FAFC)
+    val QueryBg = Color(0xFFF1F5F9)
 }
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -224,22 +234,20 @@ internal fun LogEntryCard(log: LogEntry, onClick: (LogEntry) -> Unit) {
     Row(
         modifier = Modifier
             .fillMaxWidth()
-            .padding(vertical = 4.dp)
+            .padding(vertical = 5.dp)
+            .clip(RoundedCornerShape(8.dp))
             .background(Color.White)
-            .border(1.5.dp, NetloggerListColors.Border)
-            .clickable { onClick(log) },
-        verticalAlignment = Alignment.CenterVertically
+            .border(1.dp, NetloggerListColors.Border, RoundedCornerShape(8.dp))
+            .clickable { onClick(log) }
+            .padding(10.dp),
+        verticalAlignment = Alignment.Top
     ) {
         LogBadge(log)
-        Spacer(modifier = Modifier.width(16.dp))
-        LogMainText(log, modifier = Modifier.weight(1f))
-        Spacer(modifier = Modifier.width(8.dp))
-        Text(
-            text = log.timeText(),
-            color = NetloggerListColors.Muted,
-            fontSize = 14.sp,
-            fontFamily = FontFamily.Monospace
-        )
+        Spacer(modifier = Modifier.width(10.dp))
+        when (log) {
+            is LogEntry.Api -> ApiLogContent(log, modifier = Modifier.weight(1f))
+            is LogEntry.General -> GeneralLogContent(log, modifier = Modifier.weight(1f))
+        }
     }
 }
 
@@ -249,28 +257,24 @@ private fun LogBadge(log: LogEntry) {
     val isSuccess = badge.startsWith("200")
     val isError = log.isErrorLog()
     val bg =
-        if (isSuccess) NetloggerListColors.GreenBg else if (isError) NetloggerListColors.RedBg else Color(
-            0xFFEAF2FF
-        )
+        if (isSuccess) NetloggerListColors.GreenBg else if (isError) NetloggerListColors.RedBg else NetloggerListColors.BlueBg
     val fg =
-        if (isSuccess) NetloggerListColors.GreenText else if (isError) NetloggerListColors.Red else Color(
-            0xFF244EBC
-        )
+        if (isSuccess) NetloggerListColors.GreenText else if (isError) NetloggerListColors.ErrorText else NetloggerListColors.BlueText
     val border =
-        if (isSuccess) NetloggerListColors.GreenBorder else if (isError) NetloggerListColors.RedBorder else Color(
-            0xFFC7DBFF
-        )
+        if (isSuccess) NetloggerListColors.GreenBorder else if (isError) NetloggerListColors.RedBorder else NetloggerListColors.BlueBorder
     Box(
         modifier = Modifier
+            .clip(RoundedCornerShape(6.dp))
             .background(bg)
-            .border(1.dp, border)
-            .padding(horizontal = 8.dp, vertical = 6.dp),
+            .border(1.dp, border, RoundedCornerShape(6.dp))
+            .padding(horizontal = 8.dp, vertical = 7.dp),
         contentAlignment = Alignment.Center
     ) {
         Text(
             text = badge,
             color = fg,
-            fontSize = 14.sp,
+            fontSize = 13.sp,
+            fontWeight = FontWeight.SemiBold,
             fontFamily = FontFamily.Monospace,
             textAlign = TextAlign.Center
         )
@@ -278,48 +282,175 @@ private fun LogBadge(log: LogEntry) {
 }
 
 @Composable
-private fun LogMainText(log: LogEntry, modifier: Modifier = Modifier) {
-    Row(modifier = modifier, verticalAlignment = Alignment.CenterVertically) {
-        val leading = log.leadingText()
+private fun ApiLogContent(log: LogEntry.Api, modifier: Modifier = Modifier) {
+    val urlParts = remember(log.url) { log.url.toUrlParts() }
+    Column(modifier = modifier) {
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            MethodPill(log.method)
+            Spacer(modifier = Modifier.width(8.dp))
+            StartEllipsizedText(
+                text = urlParts.path,
+                modifier = Modifier.weight(1f),
+                style = TextStyle(
+                    color = if (log.isErrorLog()) NetloggerListColors.ErrorText else NetloggerListColors.Ink,
+                    fontSize = 16.sp,
+                    fontWeight = FontWeight.Black,
+                    fontFamily = FontFamily.Monospace
+                )
+            )
+        }
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(top = 6.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            if (urlParts.query.isNotEmpty()) {
+                Text(
+                    text = urlParts.query,
+                    color = NetloggerListColors.Muted,
+                    fontSize = 12.sp,
+                    fontFamily = FontFamily.Monospace,
+                    overflow = TextOverflow.Ellipsis,
+                    maxLines = 1,
+                    modifier = Modifier
+                        .clip(RoundedCornerShape(4.dp))
+                        .background(NetloggerListColors.QueryBg)
+                        .padding(horizontal = 6.dp, vertical = 3.dp)
+                        .weight(1f)
+                )
+                Spacer(modifier = Modifier.width(8.dp))
+            } else {
+                Spacer(modifier = Modifier.weight(1f))
+            }
+            MetaText("${log.totalDuration}ms")
+            Spacer(modifier = Modifier.width(10.dp))
+            MetaText(log.timeText())
+        }
+    }
+}
+
+@Composable
+private fun GeneralLogContent(log: LogEntry.General, modifier: Modifier = Modifier) {
+    Column(modifier = modifier) {
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Text(
+                text = "[${log.tag}]",
+                color = if (log.isErrorLog()) NetloggerListColors.ErrorText else NetloggerListColors.Ink,
+                fontSize = 16.sp,
+                fontWeight = FontWeight.Black,
+                fontFamily = FontFamily.Monospace,
+                overflow = TextOverflow.Ellipsis,
+                maxLines = 1,
+                modifier = Modifier.weight(1f)
+            )
+            Spacer(modifier = Modifier.width(10.dp))
+            MetaText(log.timeText())
+        }
         Text(
-            text = leading,
-            color = if (log.isErrorLog()) NetloggerListColors.Red else NetloggerListColors.Ink,
-            fontSize = 16.sp,
-            fontWeight = FontWeight.Black,
-            fontFamily = FontFamily.Monospace,
-            maxLines = 1
-        )
-        Spacer(modifier = Modifier.width(18.dp))
-        Text(
-            text = log.bodyText(),
+            text = log.message,
             color = Color(0xFF3E494B),
-            fontSize = 16.sp,
+            fontSize = 14.sp,
             fontFamily = FontFamily.Monospace,
             overflow = TextOverflow.Ellipsis,
             maxLines = 1,
-            modifier = Modifier.weight(1f)
-        )
-        if (log is LogEntry.Api) Text(
-            "${log.totalDuration}ms",
-            color = NetloggerListColors.Muted,
-            fontSize = 14.sp
+            modifier = Modifier.padding(top = 5.dp)
         )
     }
 }
 
+@Composable
+private fun MethodPill(method: String) {
+    Text(
+        text = method,
+        color = NetloggerListColors.Ink,
+        fontSize = 13.sp,
+        fontWeight = FontWeight.Black,
+        fontFamily = FontFamily.Monospace,
+        modifier = Modifier
+            .clip(RoundedCornerShape(5.dp))
+            .background(NetloggerListColors.SurfaceSoft)
+            .border(1.dp, NetloggerListColors.Border, RoundedCornerShape(5.dp))
+            .padding(horizontal = 8.dp, vertical = 4.dp)
+    )
+}
+
+@Composable
+private fun MetaText(text: String) {
+    Text(
+        text = text,
+        color = NetloggerListColors.Muted,
+        fontSize = 12.sp,
+        fontFamily = FontFamily.Monospace,
+        maxLines = 1
+    )
+}
+
+@Composable
+private fun StartEllipsizedText(
+    text: String,
+    modifier: Modifier = Modifier,
+    style: TextStyle
+) {
+    BoxWithConstraints(modifier = modifier) {
+        val textMeasurer = rememberTextMeasurer()
+        val maxWidthPx = constraints.maxWidth
+        val displayText = remember(text, maxWidthPx, style) {
+            text.startEllipsizedToFit(maxWidthPx) { candidate ->
+                textMeasurer.measure(
+                    text = AnnotatedString(candidate),
+                    style = style,
+                    maxLines = 1
+                ).size.width
+            }
+        }
+        Text(
+            text = displayText,
+            style = style,
+            maxLines = 1
+        )
+    }
+}
+
+private fun String.startEllipsizedToFit(maxWidthPx: Int, measureWidth: (String) -> Int): String {
+    if (isEmpty() || maxWidthPx <= 0 || measureWidth(this) <= maxWidthPx) return this
+    val ellipsis = "..."
+    if (measureWidth(ellipsis) > maxWidthPx) return ellipsis
+
+    var low = 0
+    var high = length
+    var best = ellipsis
+    while (low <= high) {
+        val keep = (low + high) / 2
+        val candidate = ellipsis + takeLast(keep)
+        if (measureWidth(candidate) <= maxWidthPx) {
+            best = candidate
+            low = keep + 1
+        } else {
+            high = keep - 1
+        }
+    }
+    return best
+}
+
+private fun String.toUrlParts(): UrlParts {
+    val uri = runCatching { Uri.parse(this) }.getOrNull()
+    val rawPath = uri?.encodedPath.orEmpty().ifBlank { "/" }
+    val rawQuery = uri?.encodedQuery.orEmpty()
+    return UrlParts(
+        path = rawPath,
+        query = rawQuery.takeIf { it.isNotBlank() }?.let { "?$it" }.orEmpty()
+    )
+}
+
+private data class UrlParts(
+    val path: String,
+    val query: String
+)
+
 private fun LogEntry.badgeText() = when (this) {
-    is LogEntry.Api -> if (statusCode in 200..299) "200\nOK" else "$statusCode\nERR"
+    is LogEntry.Api -> if (statusCode in 200..299) "$statusCode\nOK" else "$statusCode\nERR"
     is LogEntry.General -> if (level == LogSeverity.ERROR) "ERROR" else level.name
-}
-
-private fun LogEntry.leadingText() = when (this) {
-    is LogEntry.Api -> method
-    is LogEntry.General -> "[$tag]"
-}
-
-private fun LogEntry.bodyText() = when (this) {
-    is LogEntry.Api -> url
-    is LogEntry.General -> message
 }
 
 private fun LogEntry.isErrorLog() = when (this) {
