@@ -54,10 +54,12 @@ fun JsonViewer(
     isLight: Boolean = false,
     searchQuery: String = "",
     currentSearchIndex: Int = -1,
-    onSearchResultsChanged: (Int) -> Unit = {}
+    onSearchResultsChanged: (Int) -> Unit = {},
+    onCurrentSearchPositionChanged: (String) -> Unit = {}
 ) {
     var rootNodes by remember { mutableStateOf<List<JsonNode>>(emptyList()) }
     var displayNodes by remember { mutableStateOf<List<JsonNode>>(emptyList()) }
+    var rawText by remember { mutableStateOf("") }
     val listState = rememberLazyListState()
     val scope = rememberCoroutineScope()
 
@@ -65,6 +67,7 @@ fun JsonViewer(
         if (jsonString.isNullOrBlank()) {
             rootNodes = emptyList()
             displayNodes = emptyList()
+            rawText = ""
             return@LaunchedEffect
         }
         val dataToParse = try {
@@ -77,6 +80,7 @@ fun JsonViewer(
         } catch (e: Exception) {
             jsonString
         }
+        rawText = dataToParse
 
         try {
             val element = JsonParser.parseString(dataToParse)
@@ -97,34 +101,62 @@ fun JsonViewer(
         displayNodes = flatten(rootNodes)
     }
 
-    // Search logic
-    val searchResults = remember(displayNodes, searchQuery) {
-        if (searchQuery.isBlank()) emptyList<Int>()
-        else {
-            displayNodes.mapIndexedNotNull { index, node ->
-                val textToSearch = "${node.key ?: ""}${node.value}"
-                if (textToSearch.contains(searchQuery, ignoreCase = true)) index else null
+    val rawSearchResults = remember(rawText, searchQuery) {
+        rawText.findSearchPositions(searchQuery)
+    }
+
+    val nodeSearchResults = remember(rootNodes, searchQuery) {
+        rootNodes.collectSearchMatches(searchQuery)
+    }
+
+    LaunchedEffect(rawSearchResults.size, searchQuery, rawText) {
+        onSearchResultsChanged(rawSearchResults.size)
+    }
+
+    LaunchedEffect(currentSearchIndex, searchQuery, rawSearchResults, nodeSearchResults) {
+        val rawPosition = rawSearchResults.getOrNull(currentSearchIndex)
+        onCurrentSearchPositionChanged(rawPosition?.label.orEmpty())
+
+        if (rawPosition != null) {
+            val target = nodeSearchResults.getOrNull(currentSearchIndex)
+            if (target != null) {
+                rootNodes.expandAncestors(target.ancestorIds)
+                displayNodes = flatten(rootNodes)
+                val targetIndex = displayNodes.indexOfFirst { it.id == target.nodeId }
+                if (targetIndex >= 0) {
+                    scope.launch {
+                        listState.animateScrollToItem(targetIndex)
+                    }
+                }
+            } else {
+                val lineIndex = (rawPosition.line - 1).coerceAtLeast(0)
+                if (lineIndex < displayNodes.size) {
+                    scope.launch {
+                        listState.animateScrollToItem(lineIndex)
+                    }
+                }
             }
+        } else if (searchQuery.isBlank()) {
+            onCurrentSearchPositionChanged("")
         }
     }
 
-    LaunchedEffect(searchResults.size) {
-        onSearchResultsChanged(searchResults.size)
-    }
-
-    LaunchedEffect(currentSearchIndex, searchResults) {
-        if (currentSearchIndex in searchResults.indices) {
-            scope.launch {
-                listState.animateScrollToItem(searchResults[currentSearchIndex])
+    LaunchedEffect(displayNodes, currentSearchIndex, nodeSearchResults) {
+        val target = nodeSearchResults.getOrNull(currentSearchIndex)
+        if (target != null) {
+            val targetIndex = displayNodes.indexOfFirst { it.id == target.nodeId }
+            if (targetIndex >= 0) {
+                scope.launch {
+                    listState.animateScrollToItem(targetIndex)
+                }
             }
         }
     }
 
     LazyColumn(modifier = modifier, state = listState) {
         itemsIndexed(displayNodes, key = { _, node -> node.id }) { index, node ->
-            val isCurrentMatch = searchQuery.isNotBlank() && 
-                    currentSearchIndex in searchResults.indices && 
-                    searchResults[currentSearchIndex] == index
+            val currentMatchNodeId = nodeSearchResults.getOrNull(currentSearchIndex)?.nodeId
+            val isCurrentMatch = searchQuery.isNotBlank() && currentMatchNodeId == node.id
 
             JsonNodeRow(
                 node = node,
@@ -139,6 +171,18 @@ fun JsonViewer(
         }
     }
 }
+
+private data class JsonSearchPosition(
+    val line: Int,
+    val column: Int
+) {
+    val label: String = "Ln $line, Col $column"
+}
+
+private data class JsonNodeSearchMatch(
+    val nodeId: String,
+    val ancestorIds: List<String>
+)
 
 private fun buildJsonTree(
     element: JsonElement,
@@ -251,6 +295,84 @@ private fun flatten(nodes: List<JsonNode>): List<JsonNode> {
         }
     }
     return result
+}
+
+private fun String.findSearchPositions(query: String): List<JsonSearchPosition> {
+    if (query.isBlank() || isEmpty()) return emptyList()
+    val positions = mutableListOf<JsonSearchPosition>()
+    var searchStart = 0
+    while (searchStart < length) {
+        val index = indexOf(query, searchStart, ignoreCase = true)
+        if (index == -1) break
+        positions.add(positionForIndex(index))
+        searchStart = index + query.length.coerceAtLeast(1)
+    }
+    return positions
+}
+
+private fun String.positionForIndex(index: Int): JsonSearchPosition {
+    var line = 1
+    var column = 1
+    val end = index.coerceIn(0, length)
+    for (i in 0 until end) {
+        if (this[i] == '\n') {
+            line++
+            column = 1
+        } else {
+            column++
+        }
+    }
+    return JsonSearchPosition(line, column)
+}
+
+private fun List<JsonNode>.collectSearchMatches(query: String): List<JsonNodeSearchMatch> {
+    if (query.isBlank()) return emptyList()
+    val matches = mutableListOf<JsonNodeSearchMatch>()
+    collectSearchMatches(query, emptyList(), matches)
+    return matches
+}
+
+private fun List<JsonNode>.collectSearchMatches(
+    query: String,
+    ancestors: List<String>,
+    matches: MutableList<JsonNodeSearchMatch>
+) {
+    for (node in this) {
+        val searchableText = buildString {
+            if (node.key != null) append("\"${node.key}\": ")
+            append(node.value.orEmpty())
+        }
+        repeat(searchableText.countOccurrences(query)) {
+            matches.add(JsonNodeSearchMatch(node.id, ancestors))
+        }
+        if (node.children.isNotEmpty()) {
+            val nextAncestors = if (node.isExpandable) ancestors + node.id else ancestors
+            node.children.collectSearchMatches(query, nextAncestors, matches)
+        }
+    }
+}
+
+private fun String.countOccurrences(query: String): Int {
+    if (query.isBlank()) return 0
+    var count = 0
+    var searchStart = 0
+    while (searchStart < length) {
+        val index = indexOf(query, searchStart, ignoreCase = true)
+        if (index == -1) break
+        count++
+        searchStart = index + query.length.coerceAtLeast(1)
+    }
+    return count
+}
+
+private fun List<JsonNode>.expandAncestors(ancestorIds: List<String>) {
+    if (ancestorIds.isEmpty()) return
+    forEach { node -> node.expandAncestors(ancestorIds.toSet()) }
+}
+
+private fun JsonNode.expandAncestors(ancestorIds: Set<String>) {
+    if (id in ancestorIds) isExpanded = true
+    children.forEach { it.expandAncestors(ancestorIds) }
 }
 
 @Composable

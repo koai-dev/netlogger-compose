@@ -50,24 +50,62 @@ fun NetloggerDetailScreen(
     // Search state
     var isSearchActive by remember { mutableStateOf(false) }
     var searchQuery by remember { mutableStateOf("") }
-    var searchResultCount by remember { mutableIntStateOf(0) }
     var currentSearchIndex by remember { mutableIntStateOf(0) }
+    var currentSearchPosition by remember { mutableStateOf("") }
 
     // Map to store result counts from different sections
     val sectionResultCounts = remember { mutableStateMapOf<String, Int>() }
-    
+
+    val activeSearchSections = when {
+        logType != "API" -> listOf("Main")
+        selectedTab == 1 -> listOf("RequestHeaders", "RequestBody")
+        selectedTab == 2 -> listOf("ResponseHeaders", "ResponseBody")
+        else -> emptyList()
+    }
+
     // Total results across all visible sections in current tab
-    searchResultCount = sectionResultCounts.values.sum()
+    val searchResultCount = activeSearchSections.sumOf { sectionResultCounts[it] ?: 0 }
+
+    fun currentIndexForSection(section: String): Int {
+        var offset = 0
+        for (key in activeSearchSections) {
+            val count = sectionResultCounts[key] ?: 0
+            if (key == section) {
+                val localIndex = currentSearchIndex - offset
+                return if (localIndex in 0 until count) localIndex else -1
+            }
+            offset += count
+        }
+        return -1
+    }
+
+    fun handleCurrentSearchPosition(section: String, position: String) {
+        if (currentIndexForSection(section) >= 0) {
+            currentSearchPosition = if (position.isNotBlank()) "${section.searchSectionLabel()} $position" else ""
+        }
+    }
 
     fun handleNextSearch() {
         if (searchResultCount > 0) {
             currentSearchIndex = (currentSearchIndex + 1) % searchResultCount
+            currentSearchPosition = ""
         }
     }
 
     fun handlePrevSearch() {
         if (searchResultCount > 0) {
             currentSearchIndex = (currentSearchIndex - 1 + searchResultCount) % searchResultCount
+            currentSearchPosition = ""
+        }
+    }
+
+    LaunchedEffect(searchResultCount) {
+        if (searchResultCount == 0) {
+            currentSearchIndex = 0
+            currentSearchPosition = ""
+        } else if (currentSearchIndex >= searchResultCount) {
+            currentSearchIndex = searchResultCount - 1
+            currentSearchPosition = ""
         }
     }
 
@@ -81,6 +119,7 @@ fun NetloggerDetailScreen(
                     isSearchActive = it
                     if (!it) {
                         searchQuery = ""
+                        currentSearchPosition = ""
                         sectionResultCounts.clear()
                     }
                 },
@@ -88,10 +127,12 @@ fun NetloggerDetailScreen(
                 onSearchQueryChanged = { 
                     searchQuery = it
                     currentSearchIndex = 0
+                    currentSearchPosition = ""
                     sectionResultCounts.clear()
                 },
                 searchResultCount = searchResultCount,
                 currentSearchIndex = currentSearchIndex,
+                currentSearchPosition = currentSearchPosition,
                 onNextSearch = ::handleNextSearch,
                 onPrevSearch = ::handlePrevSearch
             )
@@ -123,6 +164,7 @@ fun NetloggerDetailScreen(
                                 selectedTab = index
                                 // Clear results when switching tabs as content changes
                                 currentSearchIndex = 0
+                                currentSearchPosition = ""
                                 sectionResultCounts.clear()
                             },
                             text = {
@@ -151,15 +193,17 @@ fun NetloggerDetailScreen(
                             logEntry, 
                             context, 
                             searchQuery, 
-                            currentSearchIndex,
-                            onResultsChanged = { section, count -> sectionResultCounts[section] = count }
+                            currentSearchIndexForSection = ::currentIndexForSection,
+                            onResultsChanged = { section, count -> sectionResultCounts[section] = count },
+                            onCurrentPositionChanged = ::handleCurrentSearchPosition
                         )
                         2 -> ResponseTab(
                             logEntry, 
                             context, 
                             searchQuery, 
-                            currentSearchIndex,
-                            onResultsChanged = { section, count -> sectionResultCounts[section] = count }
+                            currentSearchIndexForSection = ::currentIndexForSection,
+                            onResultsChanged = { section, count -> sectionResultCounts[section] = count },
+                            onCurrentPositionChanged = ::handleCurrentSearchPosition
                         )
                     }
                 }
@@ -175,8 +219,11 @@ fun NetloggerDetailScreen(
                         jsonString = jsonString,
                         onCopy = { copyToClipboard(context, "Log Content", jsonString) },
                         searchQuery = searchQuery,
-                        currentSearchIndex = currentSearchIndex,
-                        onSearchResultsChanged = { count -> sectionResultCounts["Main"] = count }
+                        currentSearchIndex = currentIndexForSection("Main"),
+                        onSearchResultsChanged = { count -> sectionResultCounts["Main"] = count },
+                        onCurrentSearchPositionChanged = { position ->
+                            handleCurrentSearchPosition("Main", position)
+                        }
                     )
                 }
             }
@@ -245,8 +292,9 @@ private fun RequestTab(
     log: LogEntry.Api, 
     context: Context,
     searchQuery: String,
-    currentSearchIndex: Int,
-    onResultsChanged: (String, Int) -> Unit
+    currentSearchIndexForSection: (String) -> Int,
+    onResultsChanged: (String, Int) -> Unit,
+    onCurrentPositionChanged: (String, String) -> Unit
 ) {
     Column(
         modifier = Modifier
@@ -259,8 +307,11 @@ private fun RequestTab(
             title = "Request Headers", 
             headers = log.requestHeaders,
             searchQuery = searchQuery,
-            currentSearchIndex = currentSearchIndex, // This is simplified, real logic needs mapping
-            onSearchResultsChanged = { count -> onResultsChanged("RequestHeaders", count) }
+            currentSearchIndex = currentSearchIndexForSection("RequestHeaders"),
+            onSearchResultsChanged = { count -> onResultsChanged("RequestHeaders", count) },
+            onCurrentSearchPositionChanged = { position ->
+                onCurrentPositionChanged("RequestHeaders", position)
+            }
         )
 
         JsonSection(
@@ -268,8 +319,11 @@ private fun RequestTab(
             jsonString = log.requestBody,
             onCopy = { copyToClipboard(context, "Request Body", log.requestBody ?: "") },
             searchQuery = searchQuery,
-            currentSearchIndex = currentSearchIndex - (if (searchQuery.isNotEmpty()) 0 else 0), // Simplified
-            onSearchResultsChanged = { count -> onResultsChanged("RequestBody", count) }
+            currentSearchIndex = currentSearchIndexForSection("RequestBody"),
+            onSearchResultsChanged = { count -> onResultsChanged("RequestBody", count) },
+            onCurrentSearchPositionChanged = { position ->
+                onCurrentPositionChanged("RequestBody", position)
+            }
         )
     }
 }
@@ -279,8 +333,9 @@ private fun ResponseTab(
     log: LogEntry.Api, 
     context: Context,
     searchQuery: String,
-    currentSearchIndex: Int,
-    onResultsChanged: (String, Int) -> Unit
+    currentSearchIndexForSection: (String) -> Int,
+    onResultsChanged: (String, Int) -> Unit,
+    onCurrentPositionChanged: (String, String) -> Unit
 ) {
     Column(
         modifier = Modifier
@@ -300,8 +355,11 @@ private fun ResponseTab(
             title = "Response Headers", 
             headers = log.responseHeaders,
             searchQuery = searchQuery,
-            currentSearchIndex = currentSearchIndex,
-            onSearchResultsChanged = { count -> onResultsChanged("ResponseHeaders", count) }
+            currentSearchIndex = currentSearchIndexForSection("ResponseHeaders"),
+            onSearchResultsChanged = { count -> onResultsChanged("ResponseHeaders", count) },
+            onCurrentSearchPositionChanged = { position ->
+                onCurrentPositionChanged("ResponseHeaders", position)
+            }
         )
 
         JsonSection(
@@ -309,8 +367,11 @@ private fun ResponseTab(
             jsonString = log.responseBody,
             onCopy = { copyToClipboard(context, "Response Body", log.responseBody ?: "") },
             searchQuery = searchQuery,
-            currentSearchIndex = currentSearchIndex,
-            onSearchResultsChanged = { count -> onResultsChanged("ResponseBody", count) }
+            currentSearchIndex = currentSearchIndexForSection("ResponseBody"),
+            onSearchResultsChanged = { count -> onResultsChanged("ResponseBody", count) },
+            onCurrentSearchPositionChanged = { position ->
+                onCurrentPositionChanged("ResponseBody", position)
+            }
         )
     }
 }
@@ -324,4 +385,12 @@ private fun copyToClipboard(context: Context, label: String, text: String) {
     val clip = ClipData.newPlainText(label, text)
     clipboard.setPrimaryClip(clip)
     Toast.makeText(context, "$label copied!", Toast.LENGTH_SHORT).show()
+}
+
+private fun String.searchSectionLabel(): String = when (this) {
+    "RequestHeaders" -> "Req headers"
+    "RequestBody" -> "Req body"
+    "ResponseHeaders" -> "Res headers"
+    "ResponseBody" -> "Res body"
+    else -> this
 }

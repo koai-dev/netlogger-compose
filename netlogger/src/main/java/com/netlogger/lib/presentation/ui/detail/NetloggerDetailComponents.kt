@@ -40,6 +40,7 @@ import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -52,6 +53,7 @@ import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.netlogger.lib.presentation.ui.components.JsonViewer
@@ -278,7 +280,8 @@ internal fun JsonSection(
     modifier: Modifier = Modifier,
     searchQuery: String = "",
     currentSearchIndex: Int = -1,
-    onSearchResultsChanged: (Int) -> Unit = {}
+    onSearchResultsChanged: (Int) -> Unit = {},
+    onCurrentSearchPositionChanged: (String) -> Unit = {}
 ) {
     Column(modifier = modifier.fillMaxWidth()) {
         Row(
@@ -324,7 +327,8 @@ internal fun JsonSection(
                         .fillMaxSize(),
                     searchQuery = searchQuery,
                     currentSearchIndex = currentSearchIndex,
-                    onSearchResultsChanged = onSearchResultsChanged
+                    onSearchResultsChanged = onSearchResultsChanged,
+                    onCurrentSearchPositionChanged = onCurrentSearchPositionChanged
                 )
             }
         }
@@ -337,9 +341,14 @@ internal fun ExpandableHeadersSection(
     headers: String?,
     searchQuery: String = "",
     currentSearchIndex: Int = -1,
-    onSearchResultsChanged: (Int) -> Unit = {}
+    onSearchResultsChanged: (Int) -> Unit = {},
+    onCurrentSearchPositionChanged: (String) -> Unit = {}
 ) {
     var expanded by remember { mutableStateOf(true) }
+
+    LaunchedEffect(searchQuery) {
+        if (searchQuery.isNotBlank()) expanded = true
+    }
 
     Card(
         modifier = Modifier
@@ -385,7 +394,8 @@ internal fun ExpandableHeadersSection(
                             isLight = true,
                             searchQuery = searchQuery,
                             currentSearchIndex = currentSearchIndex,
-                            onSearchResultsChanged = onSearchResultsChanged
+                            onSearchResultsChanged = onSearchResultsChanged,
+                            onCurrentSearchPositionChanged = onCurrentSearchPositionChanged
                         )
                     }
                 }
@@ -403,6 +413,7 @@ internal fun NetloggerDetailTopAppBar(
     onSearchQueryChanged: (String) -> Unit = {},
     searchResultCount: Int = 0,
     currentSearchIndex: Int = 0,
+    currentSearchPosition: String = "",
     onPrevSearch: () -> Unit = {},
     onNextSearch: () -> Unit = {},
     isSearchActive: Boolean = false,
@@ -430,10 +441,20 @@ internal fun NetloggerDetailTopAppBar(
                     )
                     if (searchQuery.isNotEmpty()) {
                         Text(
-                            text = if (searchResultCount > 0) "${currentSearchIndex + 1}/$searchResultCount" else "0/0",
+                            text = buildString {
+                                append(if (searchResultCount > 0) "${currentSearchIndex + 1}/$searchResultCount" else "0/0")
+                                if (currentSearchPosition.isNotBlank()) {
+                                    append(" - ")
+                                    append(currentSearchPosition)
+                                }
+                            },
                             fontSize = 12.sp,
                             color = NetloggerDetailColors.Label,
-                            modifier = Modifier.padding(horizontal = 8.dp)
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis,
+                            modifier = Modifier
+                                .padding(horizontal = 8.dp)
+                                .width(120.dp)
                         )
                         IconButton(onClick = onPrevSearch) {
                             Icon(Icons.Default.KeyboardArrowUp, contentDescription = "Prev")
