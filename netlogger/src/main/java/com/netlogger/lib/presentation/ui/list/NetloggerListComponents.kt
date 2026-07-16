@@ -1,6 +1,5 @@
 package com.netlogger.lib.presentation.ui.list
 
-import android.net.Uri
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -43,6 +42,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.core.net.toUri
 import com.netlogger.lib.R
 import com.netlogger.lib.domain.model.LogEntry
 import com.netlogger.lib.domain.model.LogSeverity
@@ -434,7 +434,7 @@ private fun String.startEllipsizedToFit(maxWidthPx: Int, measureWidth: (String) 
 }
 
 private fun String.toUrlParts(): UrlParts {
-    val uri = runCatching { Uri.parse(this) }.getOrNull()
+    val uri = runCatching { toUri() }.getOrNull()
     val rawPath = uri?.encodedPath.orEmpty().ifBlank { "/" }
     val rawQuery = uri?.encodedQuery.orEmpty()
     return UrlParts(

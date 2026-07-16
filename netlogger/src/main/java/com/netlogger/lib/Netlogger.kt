@@ -13,27 +13,27 @@ import android.view.Gravity
 import android.widget.FrameLayout
 import androidx.appcompat.view.ContextThemeWrapper
 import androidx.core.content.ContextCompat
-import androidx.room.Room
 import com.google.android.material.floatingactionbutton.FloatingActionButton
-import com.netlogger.lib.data.repository.NetloggerRepositoryImpl
-import com.netlogger.lib.data.repository.SettingsRepositoryImpl
-import com.netlogger.lib.data.source.local.NetloggerDatabase
-import com.netlogger.lib.domain.repository.INetloggerRepository
+import com.netlogger.lib.di.createNetloggerModule
 import com.netlogger.lib.domain.repository.SettingsRepository
-import com.netlogger.lib.domain.usecase.*
+import com.netlogger.lib.domain.usecase.ClearLogsUseCase
+import com.netlogger.lib.domain.usecase.GetSettingsUseCase
 import com.netlogger.lib.presentation.manager.INetloggerManager
-import com.netlogger.lib.presentation.manager.NetloggerInterceptor
-import com.netlogger.lib.presentation.manager.NetloggerManagerImpl
 import com.netlogger.lib.presentation.ui.NetloggerActivity
 import com.netlogger.lib.presentation.util.ShakeDetector
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.Job
+import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.launchIn
 import kotlinx.coroutines.flow.onEach
 import kotlinx.coroutines.launch
 import okhttp3.Interceptor
+import org.koin.android.ext.koin.androidContext
+import org.koin.core.Koin
+import org.koin.core.context.GlobalContext
+import org.koin.core.context.loadKoinModules
+import org.koin.core.context.startKoin
 import java.lang.ref.WeakReference
 
 object Netlogger {
@@ -43,66 +43,80 @@ object Netlogger {
     private var currentActivityRef: WeakReference<Activity>? = null
     private var fab: FloatingActionButton? = null
 
-    private val scope = CoroutineScope(Dispatchers.Main + Job())
-    private var isShakeEnabled = true
+    private val scope = CoroutineScope(Dispatchers.Main + SupervisorJob())
+    private var isShakeEnabled = false
     private var sensitivity = 2.7f
-    private var isFabEnabled = true
+    private var isFabEnabled = false
     private var hasAutoResetExecuted = false
 
-    // Manual Dependency Injection Container
-    internal lateinit var database: NetloggerDatabase
-    internal lateinit var repository: INetloggerRepository
-    internal lateinit var settingsRepository: SettingsRepository
-    internal lateinit var netloggerManager: INetloggerManager
-    
-    // Use Cases
-    internal lateinit var getSettingsUseCase: GetSettingsUseCase
-    internal lateinit var saveSettingsUseCase: SaveSettingsUseCase
-    internal lateinit var getLogsUseCase: GetLogsUseCase
-    internal lateinit var clearLogsUseCase: ClearLogsUseCase
-    internal lateinit var saveApiLogUseCase: SaveApiLogUseCase
-    internal lateinit var saveGeneralLogUseCase: SaveGeneralLogUseCase
+    @Volatile
+    private var initialized = false
+
+    internal var configuration: NetloggerConfig = NetloggerConfig()
+        private set
+
+    private lateinit var koin: Koin
 
     /**
      * Khởi tạo module Netlogger. 
      * Tự động handle việc khởi tạo dependencies và đăng ký lắc điện thoại.
      */
     fun init(application: Application) {
-        initializeDependencies(application)
-        
-        checkAutoReset()
-        observeSettings()
-        setupShakeDetector(application)
+        init(application, NetloggerConfig())
     }
 
-    private fun initializeDependencies(context: Context) {
-        if (::database.isInitialized) return
+    @Synchronized
+    fun init(application: Application, config: NetloggerConfig) {
+        if (initialized) {
+            check(configuration == config) {
+                "Netlogger is already initialized with a different configuration"
+            }
+            return
+        }
 
-        database = Room.databaseBuilder(
-            context.applicationContext,
-            NetloggerDatabase::class.java,
-            "netlogger_database"
-        ).fallbackToDestructiveMigration(false).build()
+        koin = installNetloggerKoin(application, config)
+        configuration = config
 
-        val logDao = database.logDao()
-        repository = NetloggerRepositoryImpl(logDao)
-        settingsRepository = SettingsRepositoryImpl(context.applicationContext)
+        val settingsRepository = koin.get<SettingsRepository>()
+        val initialSettings = settingsRepository.getCurrentSettings()
+        isShakeEnabled = initialSettings.enableShakeDetector
+        sensitivity = initialSettings.shakeSensitivity
+        isFabEnabled = initialSettings.enableFloatingButton
 
-        saveApiLogUseCase = SaveApiLogUseCase(repository)
-        saveGeneralLogUseCase = SaveGeneralLogUseCase(repository)
-        getLogsUseCase = GetLogsUseCase(repository)
-        clearLogsUseCase = ClearLogsUseCase(repository)
-        getSettingsUseCase = GetSettingsUseCase(settingsRepository)
-        saveSettingsUseCase = SaveSettingsUseCase(settingsRepository)
+        checkAutoReset()
+        if (config.allowShakeDetector || config.allowFloatingButton) {
+            observeSettings()
+            setupShakeDetector(application)
+        }
+        initialized = true
+    }
 
-        val interceptor = NetloggerInterceptor(saveApiLogUseCase, getSettingsUseCase)
-        netloggerManager = NetloggerManagerImpl(saveGeneralLogUseCase, interceptor)
+    internal fun installNetloggerKoin(application: Application, config: NetloggerConfig): Koin =
+        synchronized(GlobalContext) {
+            val netloggerModule = createNetloggerModule(application, config)
+            val existingKoin = GlobalContext.getOrNull()
+            if (existingKoin != null) {
+                loadKoinModules(netloggerModule)
+                existingKoin
+            } else {
+                startKoin {
+                    androidContext(application)
+                    modules(netloggerModule)
+                }.koin
+            }
+        }
+
+    internal fun managerOrNull(): INetloggerManager? {
+        if (!initialized) return null
+        return runCatching { koin.getOrNull<INetloggerManager>() }.getOrNull()
     }
 
     private fun checkAutoReset() {
         if (hasAutoResetExecuted) return
         hasAutoResetExecuted = true
 
+        val getSettingsUseCase = koin.get<GetSettingsUseCase>()
+        val clearLogsUseCase = koin.get<ClearLogsUseCase>()
         scope.launch {
             val settings = getSettingsUseCase().first()
             if (settings.autoResetOnStart) {
@@ -112,6 +126,7 @@ object Netlogger {
     }
 
     private fun observeSettings() {
+        val getSettingsUseCase = koin.get<GetSettingsUseCase>()
         getSettingsUseCase().onEach { settings ->
             isShakeEnabled = settings.enableShakeDetector
             sensitivity = settings.shakeSensitivity
@@ -196,8 +211,11 @@ object Netlogger {
      * Lấy Interceptor để gắn vào OkHttpClient.
      */
     fun getInterceptor(): Interceptor {
-        return netloggerManager.getInterceptor()
+        check(initialized) { "Netlogger.init(application, config) must be called first" }
+        return koin.get<INetloggerManager>().getInterceptor()
     }
+
+    internal fun isInitialized(): Boolean = initialized
 
     @SuppressLint("RestrictedApi")
     private fun showFloatingButton(activity: Activity) {
@@ -242,4 +260,5 @@ object Netlogger {
             fab = null
         }
     }
+
 }

@@ -40,23 +40,27 @@ dependencyResolutionManagement {
 }
 ```
 
-### Step 2. Add the dependency
+### Step 2. Add the dependency only to an approved environment
 
 Add the following to your app-level `build.gradle` or `build.gradle.kts`:
 
 **Groovy (build.gradle):**
 ```gradle
 dependencies {
-    implementation 'com.github.koai-dev:netlogger-compose:1.0.0'
+    debugImplementation 'com.github.koai-dev:netlogger-compose:<version>'
 }
 ```
 
 **Kotlin DSL (build.gradle.kts):**
 ```kotlin
 dependencies {
-    implementation("com.github.koai-dev:netlogger-compose:1.0.0")
+    debugImplementation("com.github.koai-dev:netlogger-compose:<version>")
 }
 ```
+
+For a custom internal or QA flavor, use the matching configuration instead, for example
+`internalImplementation` or `qaImplementation`. Do not use the unscoped `implementation`
+configuration unless the target environment has explicitly approved network logging.
 
 ## Usage
 
@@ -67,7 +71,21 @@ In your `Application` class, initialize Netlogger:
 class MyApp : Application() {
     override fun onCreate() {
         super.onCreate()
-        Netlogger.init(this)
+        Netlogger.init(
+            this,
+            NetloggerConfig(
+                maximumLogLevel = LogLevel.ALL,
+                captureBodies = true,
+                captureGeneralLogs = true,
+                enableLogcatOutput = true,
+                allowShakeDetector = true,
+                allowFloatingButton = true,
+                storage = NetloggerStorage.MEMORY_ONLY,
+                maxBodyBytes = 256 * 1024L,
+                maxLogEntries = 500,
+                retentionMillis = 24 * 60 * 60 * 1000L
+            )
+        )
     }
 }
 ```
@@ -82,9 +100,9 @@ val okHttpClient = OkHttpClient.Builder()
 ```
 
 ### 3. Open Netlogger
-There are two ways to open the Netlogger UI:
-- **Shake Device**: Shake your phone to trigger the UI (can be configured in Settings).
-- **Floating Button**: A floating button automatically appears on resumed activities (can be disabled).
+There are three ways to open the Netlogger UI:
+- **Shake Device**: opt in through `NetloggerConfig` or enable it in Settings.
+- **Floating Button**: opt in through `NetloggerConfig` or enable it in Settings.
 - **Manual Launch**:
   ```kotlin
   val intent = Intent(context, NetloggerActivity::class.java)
@@ -101,9 +119,11 @@ LogUtil.info("TAG", "Informational message")
 ```
 These logs will appear in the "General" filter category in the log list.
 
-## Production Handling (Best Practice)
+## Environment isolation (required)
 
-To ensure Netlogger has **zero code footprint** in your `release` APK, it is highly recommended to use **Android Source Sets** to provide separate implementations for `debug` and `release`.
+To ensure Netlogger has **zero code footprint** in your production APK, use a scoped dependency
+such as `debugImplementation` together with Android source sets. A runtime `BuildConfig.DEBUG`
+check alone does not remove the library, manifest entries, or transitive dependencies from an APK.
 
 ### 1. Define the Interface (or shared structure)
 You will create two files with the **exact same package and name** in different source sets.
@@ -112,7 +132,15 @@ You will create two files with the **exact same package and name** in different 
 ```kotlin
 object NetloggerProxy {
     fun init(application: Application) {
-        Netlogger.init(application)
+        Netlogger.init(
+            application,
+            NetloggerConfig(
+                maximumLogLevel = LogLevel.ALL,
+                captureBodies = true,
+                captureGeneralLogs = true,
+                enableLogcatOutput = true
+            )
+        )
     }
 
     fun getInterceptor(): Interceptor {
@@ -148,11 +176,57 @@ NetloggerProxy.getInterceptor()?.let {
 }
 ```
 
-## Configuration
-You can customize Netlogger behavior in the **Settings** screen within the app:
+## Secure defaults and configuration
+
+Calling `Netlogger.init(application)` without a configuration is safe by default:
+
+- API logging starts at `NONE`.
+- Request and response body capture is disabled.
+- Manual/general log capture is disabled.
+- Logs are held in memory only.
+- Logcat output is disabled by default.
+- Shake and floating-button entry points are disabled.
+- The Netlogger window blocks screenshots and non-secure displays.
+- Authorization, cookies, common token/query names, credentials and configured custom fields are redacted.
+- Bodies, messages, retained entries and retention duration have hard upper bounds.
+
+When `captureBodies` is enabled, Netlogger still skips one-shot, duplex, binary, unknown-length
+and oversized bodies. Add organization-specific names through `additionalRedactedHeaders`,
+`additionalRedactedQueryParameters`, and `additionalRedactedBodyFields`.
+
+`maximumLogLevel`, `allowShakeDetector`, and `allowFloatingButton` are environment-level caps.
+Values restored from Settings can lower these capabilities but cannot exceed what the integrating
+app approved in `NetloggerConfig`.
+
+`enableLogcatOutput = true` is intended only for explicitly approved beta/staging source sets.
+Console output uses the same bounded capture as the UI and is redacted again immediately before
+calling Logcat. It does not bypass `maximumLogLevel` or `captureBodies`; credentials, cookies,
+tokens, passwords, common PII and configured custom fields remain redacted.
+
+## Koin integration
+
+Netlogger owns a namespaced Koin module for its database, repositories, use cases, interceptor,
+manager and ViewModels. `Netlogger.init(...)` is synchronized and safely coexists with the host:
+
+- If the host has already called `startKoin`, Netlogger only loads its module into that container.
+- If no global Koin container exists, Netlogger starts one with the application context and its
+  own module.
+- Netlogger does not enable Koin's Android logger and does not register or replace the host's
+  unqualified `Context`/`Application` definitions.
+
+If the host application owns additional Koin modules, start the host Koin container before calling
+`Netlogger.init(...)`. Otherwise, add later host modules with `loadKoinModules(...)` instead of
+calling `startKoin` a second time.
+
+`NetloggerStorage.PERSISTENT_NO_BACKUP` is an explicit opt-in. Its database is placed under the
+host application's no-backup directory and is pruned by both age and entry count. `MEMORY_ONLY`
+remains recommended.
+
+You can also customize runtime behavior in the **Settings** screen:
 - **Auto-reset logs**: Automatically clear all logs from previous sessions when the app starts.
 - **Enable Shake Detector**: Toggle the shake-to-open feature.
 - **Shake Sensitivity**: Adjust how hard you need to shake the device.
+- **API Log Level**: Select metadata, headers, or body logging within the limits allowed by `NetloggerConfig`.
 
 ## License
 Copyright 2024 Koai Dev.

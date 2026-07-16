@@ -3,6 +3,7 @@ package com.netlogger.lib.presentation.ui.detail
 import android.content.ClipData
 import android.content.ClipboardManager
 import android.content.Context
+import android.os.PersistableBundle
 import android.widget.Toast
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
@@ -382,10 +383,16 @@ private fun copyToClipboard(context: Context, label: String, text: String) {
         return
     }
     val clipboard = context.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
-    val clip = ClipData.newPlainText(label, text)
+    val clip = ClipData.newPlainText(label, text).apply {
+        description.extras = PersistableBundle().apply {
+            putBoolean(SENSITIVE_CLIPBOARD_EXTRA, true)
+        }
+    }
     clipboard.setPrimaryClip(clip)
     Toast.makeText(context, "$label copied!", Toast.LENGTH_SHORT).show()
 }
+
+private const val SENSITIVE_CLIPBOARD_EXTRA = "android.content.extra.IS_SENSITIVE"
 
 private fun String.searchSectionLabel(): String = when (this) {
     "RequestHeaders" -> "Req headers"

@@ -5,5 +5,6 @@ import kotlinx.coroutines.flow.Flow
 
 interface SettingsRepository {
     fun getSettings(): Flow<LogSettings>
+    fun getCurrentSettings(): LogSettings = LogSettings()
     suspend fun saveSettings(settings: LogSettings)
 }

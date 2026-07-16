@@ -6,23 +6,10 @@ import com.netlogger.lib.presentation.manager.INetloggerManager
 
 object LogUtil {
     private val netloggerManager: INetloggerManager?
-        get() = try {
-            Netlogger.netloggerManager
-        } catch (e: Exception) {
-            null
-        }
+        get() = Netlogger.managerOrNull()
 
     fun log(tag: String, message: String, level: LogSeverity = LogSeverity.DEBUG) {
-        try {
-            val manager = netloggerManager
-            if (manager != null) {
-                manager.log(tag, message, level)
-            } else {
-                println("Netlogger fallback: [$tag] $message")
-            }
-        } catch (e: Exception) {
-            println("Netlogger fallback: [$tag] $message")
-        }
+        netloggerManager?.log(tag, message, level)
     }
 
     fun info(tag: String, message: String) = log(tag, message, LogSeverity.INFO)

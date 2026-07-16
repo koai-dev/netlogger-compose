@@ -40,7 +40,7 @@ android {
         }
     }
 }
-val libVersion = "1.3.2"
+val libVersion = "1.4.0"
 afterEvaluate {
     publishing {
         publications {
@@ -69,10 +69,11 @@ dependencies {
     implementation(libs.androidx.compose.ui)
     implementation(libs.androidx.compose.ui.graphics)
     implementation(libs.androidx.compose.ui.tooling.preview)
-    implementation(libs.androidx.compose.material3)
     implementation(libs.androidx.material3)
     implementation(libs.material)
+    implementation(libs.koin.android)
     testImplementation(libs.junit)
+    testImplementation(libs.okhttp.mockwebserver)
     androidTestImplementation(libs.androidx.junit)
     androidTestImplementation(libs.androidx.espresso.core)
     androidTestImplementation(platform(libs.androidx.compose.bom))
@@ -82,26 +83,20 @@ dependencies {
 
     // Room
     implementation(libs.androidx.room.runtime)
-    implementation(libs.androidx.lifecycle.service)
     ksp(libs.androidx.room.compiler)
     implementation(libs.androidx.room.ktx)
 
     // ViewModel & Coroutines
     implementation(libs.androidx.lifecycle.viewmodel.ktx)
-    implementation(libs.androidx.lifecycle.livedata.ktx)
     implementation(libs.kotlinx.coroutines.android)
-
-    // WorkManager
-    implementation(libs.androidx.work.runtime.ktx)
 
     // Gson
     implementation(libs.gson)
 
     // OkHttp
-    implementation(libs.okhttp)
+    api(libs.okhttp)
 
-    // Koin
-    implementation(libs.androidx.compose.material.icons.core)
+    // Icons
     implementation(libs.androidx.compose.material.icons.extended)
 }
 
@@ -113,7 +108,7 @@ tasks.register("createReleaseTag") {
     doLast {
         val tagName = "v$libVersion"
         try {
-            println("Creating tag: $tagName")
+            logger.lifecycle("Creating tag: $tagName")
 
             providers
                 .exec {
@@ -127,9 +122,9 @@ tasks.register("createReleaseTag") {
                 }.result
                 .get()
 
-            println("Successfully created and pushed tag: $tagName")
+            logger.lifecycle("Successfully created and pushed tag: $tagName")
         } catch (e: Exception) {
-            println("❌ Failed to create/push tag $tagName: ${e.message}")
+            throw GradleException("Failed to create/push tag $tagName", e)
         }
     }
 }

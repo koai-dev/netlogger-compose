@@ -1,33 +1,71 @@
 package com.netlogger.lib.presentation.manager
 
-import android.util.Log
-import com.google.gson.JsonObject
+import com.netlogger.lib.NetloggerConfig
 import com.netlogger.lib.domain.model.LogEntry
 import com.netlogger.lib.domain.model.LogLevel
 import com.netlogger.lib.domain.usecase.GetSettingsUseCase
 import com.netlogger.lib.domain.usecase.SaveApiLogUseCase
+import com.netlogger.lib.presentation.util.NetloggerConsoleLogger
+import com.netlogger.lib.presentation.util.NetloggerRedactor
 import kotlinx.coroutines.CoroutineScope
-import kotlinx.coroutines.flow.collect
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.channels.BufferOverflow
+import kotlinx.coroutines.channels.Channel
+import kotlinx.coroutines.cancel
+import kotlinx.coroutines.flow.collect
 import kotlinx.coroutines.launch
 import okhttp3.Interceptor
+import okhttp3.MediaType
 import okhttp3.Request
+import okhttp3.RequestBody
 import okhttp3.Response
 import okio.Buffer
-import java.nio.charset.Charset
+import okio.ForwardingSink
+import okio.buffer
+import java.io.IOException
+import java.nio.charset.StandardCharsets
 
-class NetloggerInterceptor(
+class NetloggerInterceptor internal constructor(
     private val saveApiLogUseCase: SaveApiLogUseCase,
-    private val getSettingsUseCase: GetSettingsUseCase
+    private val getSettingsUseCase: GetSettingsUseCase,
+    private val config: NetloggerConfig,
+    private val redactor: NetloggerRedactor,
+    initialLogLevel: LogLevel
 ) : Interceptor {
+
+    @Deprecated(
+        message = "Use Netlogger.init(application, config) and Netlogger.getInterceptor()",
+        level = DeprecationLevel.WARNING
+    )
+    constructor(
+        saveApiLogUseCase: SaveApiLogUseCase,
+        getSettingsUseCase: GetSettingsUseCase
+    ) : this(
+        saveApiLogUseCase = saveApiLogUseCase,
+        getSettingsUseCase = getSettingsUseCase,
+        config = NetloggerConfig(),
+        redactor = NetloggerRedactor(NetloggerConfig()),
+        initialLogLevel = LogLevel.NONE
+    )
+
     private val scope = CoroutineScope(Dispatchers.IO + SupervisorJob())
-    private val utf8 = Charset.forName("UTF-8")
+    private val consoleLogger = NetloggerConsoleLogger(config, redactor)
+    private val logQueue = Channel<LogEntry.Api>(
+        capacity = MAX_PENDING_LOGS,
+        onBufferOverflow = BufferOverflow.DROP_OLDEST
+    )
 
     @Volatile
-    private var currentLogLevel: LogLevel = LogLevel.ALL
+    private var currentLogLevel: LogLevel = initialLogLevel
 
     init {
+        scope.launch {
+            for (log in logQueue) {
+                runCatching { consoleLogger.logApi(log) }
+                runCatching { saveApiLogUseCase(log) }
+            }
+        }
         scope.launch {
             getSettingsUseCase().collect { settings ->
                 currentLogLevel = settings.logLevel
@@ -37,205 +75,185 @@ class NetloggerInterceptor(
 
     override fun intercept(chain: Interceptor.Chain): Response {
         val level = currentLogLevel
-        if (!level.info) {
-            return chain.proceed(chain.request())
-        }
+        if (!level.info) return chain.proceed(chain.request())
 
         val request = chain.request()
         val requestTime = System.currentTimeMillis()
+        val requestBodyString = captureRequestBody(request.body, level)
 
-        // Read request body
-        var requestBodyString: String? = null
-        val requestBody = request.body
-        if (level.body && requestBody != null) {
-            try {
-                val buffer = Buffer()
-                requestBody.writeTo(buffer)
-                requestBodyString = buffer.readString(utf8)
-            } catch (e: Exception) {
-                requestBodyString = "Error reading request body: ${e.message}"
-            }
-        }
-
-        // Print request to console
-        Log.w("Netlogger", "--> ${request.method} ${request.url}")
-        if (level.headers) {
-            val headers = request.headers
-            for (i in 0 until headers.size) {
-                Log.w("Netlogger", "${headers.name(i)}: ${headers.value(i)}")
-            }
-            requestBody?.contentType()?.let {
-                Log.w("Netlogger", "Content-Type: $it")
-            }
-            try {
-                val len = requestBody?.contentLength() ?: -1
-                if (len >= 0) {
-                    Log.w("Netlogger", "Content-Length: $len")
-                }
-            } catch (_: Exception) {}
-        }
-        if (level.body && requestBodyString != null) {
-            Log.w("Netlogger", "")
-            Log.w("Netlogger", requestBodyString)
-        }
-        Log.w("Netlogger", "--> END ${request.method}")
-
-        var response: Response
-        try {
-            response = chain.proceed(request)
-        } catch (e: Exception) {
+        val response = try {
+            chain.proceed(request)
+        } catch (exception: Exception) {
             val endTime = System.currentTimeMillis()
-            Log.w("Netlogger", "<-- HTTP FAILED: $e")
-            // On error, we only have the original request headers (pre-chain).
-            // Build them as JSON for consistent parsing downstream.
-            val headersJson = if (level.headers) buildAllHeadersJson(request) else null
-            val bodyJson = if (level.body) requestBodyString else null
-            val errorBody = if (level.body) (e.message ?: e.toString()) else null
-            scope.launch {
-                saveApiLogUseCase(
-                    LogEntry.Api(
-                        tag = "API_ERROR",
-                        method = request.method,
-                        url = request.url.toString(),
-                        requestHeaders = headersJson,
-                        requestBody = bodyJson,
-                        responseHeaders = null,
-                        responseBody = errorBody,
-                        statusCode = 0,
-                        requestTime = requestTime,
-                        responseTime = endTime,
-                        totalDuration = endTime - requestTime
-                    )
-                )
+            val requestHeaders = if (level.headers) buildAllHeadersJson(request) else null
+            val errorBody = if (level.body && config.captureBodies) {
+                redactor.redactText(exception.message.orEmpty())
+            } else {
+                null
             }
-            throw e
+
+            logQueue.trySend(
+                LogEntry.Api(
+                    tag = "API_ERROR",
+                    method = request.method,
+                    url = redactor.redactUrl(request.url),
+                    requestHeaders = requestHeaders,
+                    requestBody = requestBodyString,
+                    responseHeaders = null,
+                    responseBody = errorBody,
+                    statusCode = 0,
+                    requestTime = requestTime,
+                    responseTime = endTime,
+                    totalDuration = endTime - requestTime
+                )
+            )
+            throw exception
         }
 
         val responseTime = System.currentTimeMillis()
-        val responseBody = response.body
-        var responseBodyString: String? = null
-
-        if (level.body && responseBody.contentLength() != 0L) {
-            try {
-                val source = responseBody.source()
-                source.request(Long.MAX_VALUE) // Buffer the entire body.
-                val buffer = source.buffer
-                responseBodyString = buffer.clone().readString(utf8)
-            } catch (e: Exception) {
-                responseBodyString = "Error reading response body: ${e.message}"
-            }
-        }
-
-        // Use response.request to capture the FINAL request that was actually sent.
-        // This includes all headers added by other interceptors in the chain
-        // (e.g. AuthenticationInterceptor, BridgeInterceptor, etc.).
         val sentRequest = response.request
         val sentHeadersJson = if (level.headers) buildAllHeadersJson(sentRequest) else null
         val responseHeadersJson = if (level.headers) buildResponseHeadersJson(response) else null
+        val responseBodyString = captureResponseBody(response, level)
 
-        // Print response to console
-        val duration = responseTime - requestTime
-        Log.w("Netlogger", "<-- ${response.code} ${response.message} ${sentRequest.url} (${duration}ms)")
-        if (level.headers) {
-            val headers = response.headers
-            for (i in 0 until headers.size) {
-                Log.w("Netlogger", "${headers.name(i)}: ${headers.value(i)}")
-            }
-        }
-        if (level.body && responseBodyString != null) {
-            Log.w("Netlogger", "")
-            Log.w("Netlogger", responseBodyString)
-        }
-        Log.w("Netlogger", "<-- END HTTP")
-
-        scope.launch {
-            saveApiLogUseCase(
-                LogEntry.Api(
-                    tag = "API_SUCCESS",
-                    method = sentRequest.method,
-                    url = sentRequest.url.toString(),
-                    requestHeaders = sentHeadersJson,
-                    requestBody = requestBodyString,
-                    responseHeaders = responseHeadersJson,
-                    responseBody = responseBodyString,
-                    statusCode = response.code,
-                    requestTime = requestTime,
-                    responseTime = responseTime,
-                    totalDuration = responseTime - requestTime
-                )
+        logQueue.trySend(
+            LogEntry.Api(
+                tag = "API_SUCCESS",
+                method = sentRequest.method,
+                url = redactor.redactUrl(sentRequest.url),
+                requestHeaders = sentHeadersJson,
+                requestBody = requestBodyString,
+                responseHeaders = responseHeadersJson,
+                responseBody = responseBodyString,
+                statusCode = response.code,
+                requestTime = requestTime,
+                responseTime = responseTime,
+                totalDuration = responseTime - requestTime
             )
-        }
+        )
 
         return response
     }
 
-    /**
-     * Builds a JSON object containing ALL request headers.
-     * Includes:
-     *  - All explicit headers from request.headers
-     *  - Content-Type from RequestBody (if present and not already in headers)
-     *  - Content-Length from RequestBody (if present and not already in headers)
-     *  - Host derived from the URL (if not already in headers)
-     */
-    private fun buildAllHeadersJson(request: Request): String {
-        val json = JsonObject()
-
-        // 1. All explicit headers (including ones added by other interceptors)
-        val headers = request.headers
-        for (i in 0 until headers.size) {
-            val name = headers.name(i)
-            val value = headers.value(i)
-            // OkHttp allows duplicate header names; append with comma for JSON
-            if (json.has(name)) {
-                val existing = json.get(name).asString
-                json.addProperty(name, "$existing, $value")
-            } else {
-                json.addProperty(name, value)
-            }
-        }
-
-        // 2. Content-Type from RequestBody (often not in headers for app interceptors)
-        val body = request.body
-        if (body != null) {
-            if (!json.has("Content-Type") && !json.has("content-type")) {
-                body.contentType()?.let { mediaType ->
-                    json.addProperty("Content-Type", mediaType.toString())
-                }
-            }
-            if (!json.has("Content-Length") && !json.has("content-length")) {
-                try {
-                    val len = body.contentLength()
-                    if (len >= 0) {
-                        json.addProperty("Content-Length", len.toString())
-                    }
-                } catch (_: Exception) { }
-            }
-        }
-
-        // 3. Host from URL
-        if (!json.has("Host") && !json.has("host")) {
-            json.addProperty("Host", request.url.host)
-        }
-
-        return json.toString()
+    internal fun close() {
+        logQueue.close()
+        scope.cancel()
     }
 
-    /**
-     * Builds a JSON object from all response headers.
-     */
-    private fun buildResponseHeadersJson(response: Response): String {
-        val json = JsonObject()
-        val headers = response.headers
-        for (i in 0 until headers.size) {
-            val name = headers.name(i)
-            val value = headers.value(i)
-            if (json.has(name)) {
-                val existing = json.get(name).asString
-                json.addProperty(name, "$existing, $value")
-            } else {
-                json.addProperty(name, value)
+    private fun captureRequestBody(body: RequestBody?, level: LogLevel): String? {
+        if (!level.body || !config.captureBodies || body == null) return null
+        if (body.isOneShot()) return OMITTED_ONE_SHOT
+        if (body.isDuplex()) return OMITTED_DUPLEX
+
+        val contentType = body.contentType()
+        if (!isTextual(contentType)) return OMITTED_NON_TEXT
+
+        val contentLength = runCatching { body.contentLength() }.getOrDefault(-1L)
+        if (contentLength < 0L) return OMITTED_UNKNOWN_LENGTH
+        if (contentLength > config.maxBodyBytes) return omittedTooLarge(contentLength)
+        if (contentLength == 0L) return null
+
+        val buffer = Buffer()
+        val limitedSink = object : ForwardingSink(buffer) {
+            private var bytesWritten = 0L
+
+            override fun write(source: Buffer, byteCount: Long) {
+                if (bytesWritten + byteCount > config.maxBodyBytes) {
+                    throw BodyLimitExceededException()
+                }
+                super.write(source, byteCount)
+                bytesWritten += byteCount
+            }
+        }.buffer()
+
+        return try {
+            body.writeTo(limitedSink)
+            limitedSink.flush()
+            val charset = contentType?.charset(StandardCharsets.UTF_8) ?: StandardCharsets.UTF_8
+            redactor.redactBody(buffer.readString(charset), contentType?.toString())
+        } catch (_: BodyLimitExceededException) {
+            omittedTooLarge(config.maxBodyBytes + 1L)
+        } catch (_: Exception) {
+            OMITTED_READ_ERROR
+        } finally {
+            runCatching { limitedSink.close() }
+        }
+    }
+
+    private fun captureResponseBody(response: Response, level: LogLevel): String? {
+        if (!level.body || !config.captureBodies) return null
+
+        val body = response.body
+        val contentType = body.contentType()
+        if (!isTextual(contentType)) return OMITTED_NON_TEXT
+
+        val contentLength = body.contentLength()
+        if (contentLength < 0L) return OMITTED_UNKNOWN_LENGTH
+        if (contentLength > config.maxBodyBytes) return omittedTooLarge(contentLength)
+        if (contentLength == 0L) return null
+
+        return runCatching {
+            val raw = response.peekBody(config.maxBodyBytes).string()
+            redactor.redactBody(raw, contentType?.toString())
+        }.getOrDefault(OMITTED_READ_ERROR)
+    }
+
+    private fun buildAllHeadersJson(request: Request): String {
+        val headers = mutableListOf<Pair<String, String>>()
+        for (index in 0 until request.headers.size) {
+            headers += request.headers.name(index) to request.headers.value(index)
+        }
+
+        val body = request.body
+        if (body != null) {
+            if (headers.none { it.first.equals("Content-Type", ignoreCase = true) }) {
+                body.contentType()?.let { headers += "Content-Type" to it.toString() }
+            }
+            if (headers.none { it.first.equals("Content-Length", ignoreCase = true) }) {
+                runCatching { body.contentLength() }
+                    .getOrNull()
+                    ?.takeIf { it >= 0L }
+                    ?.let { headers += "Content-Length" to it.toString() }
             }
         }
-        return json.toString()
+        if (headers.none { it.first.equals("Host", ignoreCase = true) }) {
+            headers += "Host" to request.url.host
+        }
+
+        return redactor.headersToJson(headers)
+    }
+
+    private fun buildResponseHeadersJson(response: Response): String {
+        val headers = buildList {
+            for (index in 0 until response.headers.size) {
+                add(response.headers.name(index) to response.headers.value(index))
+            }
+        }
+        return redactor.headersToJson(headers)
+    }
+
+    private fun isTextual(contentType: MediaType?): Boolean {
+        if (contentType == null) return false
+        val subtype = contentType.subtype.lowercase()
+        return contentType.type.equals("text", ignoreCase = true) ||
+            subtype.contains("json") ||
+            subtype.contains("xml") ||
+            subtype.contains("x-www-form-urlencoded") ||
+            subtype.contains("graphql") ||
+            subtype.contains("javascript")
+    }
+
+    private fun omittedTooLarge(contentLength: Long): String =
+        "[OMITTED: body size $contentLength bytes exceeds ${config.maxBodyBytes}-byte limit]"
+
+    private class BodyLimitExceededException : IOException()
+
+    private companion object {
+        const val OMITTED_ONE_SHOT = "[OMITTED: one-shot request body]"
+        const val OMITTED_DUPLEX = "[OMITTED: duplex request body]"
+        const val OMITTED_NON_TEXT = "[OMITTED: non-text body]"
+        const val OMITTED_UNKNOWN_LENGTH = "[OMITTED: body length is unknown]"
+        const val OMITTED_READ_ERROR = "[OMITTED: body could not be read safely]"
+        const val MAX_PENDING_LOGS = 64
     }
 }
