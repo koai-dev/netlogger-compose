@@ -26,12 +26,12 @@ data class NetloggerConfig(
     val additionalRedactedBodyFields: Set<String> = emptySet()
 ) {
     init {
-        require(maxBodyBytes in 1..MAX_ALLOWED_BODY_BYTES) {
-            "maxBodyBytes must be between 1 and $MAX_ALLOWED_BODY_BYTES"
-        }
-        require(maxGeneralMessageChars in 1..MAX_ALLOWED_GENERAL_MESSAGE_CHARS) {
-            "maxGeneralMessageChars must be between 1 and $MAX_ALLOWED_GENERAL_MESSAGE_CHARS"
-        }
+//        require(maxBodyBytes in 1..MAX_ALLOWED_BODY_BYTES) {
+//            "maxBodyBytes must be between 1 and $MAX_ALLOWED_BODY_BYTES"
+//        }
+//        require(maxGeneralMessageChars in 1..MAX_ALLOWED_GENERAL_MESSAGE_CHARS) {
+//            "maxGeneralMessageChars must be between 1 and $MAX_ALLOWED_GENERAL_MESSAGE_CHARS"
+//        }
         require(maxLogEntries in 1..MAX_ALLOWED_LOG_ENTRIES) {
             "maxLogEntries must be between 1 and $MAX_ALLOWED_LOG_ENTRIES"
         }
