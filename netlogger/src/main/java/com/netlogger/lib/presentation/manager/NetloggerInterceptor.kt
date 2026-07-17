@@ -158,9 +158,9 @@ class NetloggerInterceptor internal constructor(
             private var bytesWritten = 0L
 
             override fun write(source: Buffer, byteCount: Long) {
-                if (bytesWritten + byteCount > config.maxBodyBytes) {
-                    throw BodyLimitExceededException()
-                }
+//                if (bytesWritten + byteCount > config.maxBodyBytes) {
+//                    throw BodyLimitExceededException()
+//                }
                 super.write(source, byteCount)
                 bytesWritten += byteCount
             }
