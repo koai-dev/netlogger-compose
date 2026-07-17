@@ -97,6 +97,130 @@ class NetloggerInterceptorTest {
     }
 
     @Test
+    fun `chunked response with unknown length is captured without consuming application body`() {
+        val responseBody = """{"result":"chunked"}"""
+        val server = MockWebServer()
+        server.enqueue(
+            MockResponse()
+                .setHeader("Content-Type", "application/json")
+                .setChunkedBody(responseBody, 3)
+        )
+        server.start()
+
+        try {
+            val repository = CapturingRepository()
+            val client = client(repository, maxBodyBytes = 64L)
+            val request = Request.Builder().url(server.url("/chunked")).build()
+
+            val bodySeenByApplication = client.newCall(request).execute().use { it.body.string() }
+
+            assertEquals(responseBody, bodySeenByApplication)
+            assertTrue(repository.awaitLog())
+            assertEquals(responseBody, repository.lastApiLog?.responseBody)
+        } finally {
+            server.shutdown()
+        }
+    }
+
+    @Test
+    fun `repeatable request body with unknown length is captured`() {
+        val requestJson = """{"value":"unknown-length"}"""
+        val server = MockWebServer()
+        server.enqueue(
+            MockResponse()
+                .setHeader("Content-Type", "application/json")
+                .setBody("{}")
+        )
+        server.start()
+
+        try {
+            val unknownLengthBody = object : RequestBody() {
+                override fun contentType() = "application/json".toMediaType()
+                override fun contentLength() = -1L
+                override fun writeTo(sink: BufferedSink) {
+                    sink.writeUtf8(requestJson)
+                }
+            }
+            val repository = CapturingRepository()
+            val client = client(repository, maxBodyBytes = 64L)
+            val request = Request.Builder().url(server.url("/unknown-length")).post(unknownLengthBody).build()
+
+            client.newCall(request).execute().use { it.body.string() }
+
+            assertTrue(repository.awaitLog())
+            assertEquals(requestJson, repository.lastApiLog?.requestBody)
+            assertEquals(requestJson, server.takeRequest().body.readUtf8())
+        } finally {
+            server.shutdown()
+        }
+    }
+
+    @Test
+    fun `oversized request body with unknown length is omitted but still sent`() {
+        val requestText = "x".repeat(1_024)
+        val server = MockWebServer()
+        server.enqueue(
+            MockResponse()
+                .setHeader("Content-Type", "application/json")
+                .setBody("{}")
+        )
+        server.start()
+
+        try {
+            val unknownLengthBody = object : RequestBody() {
+                override fun contentType() = "text/plain".toMediaType()
+                override fun contentLength() = -1L
+                override fun writeTo(sink: BufferedSink) {
+                    sink.writeUtf8(requestText)
+                }
+            }
+            val repository = CapturingRepository()
+            val client = client(repository, maxBodyBytes = 64L)
+            val request = Request.Builder().url(server.url("/large-unknown-length")).post(unknownLengthBody).build()
+
+            client.newCall(request).execute().use { it.body.string() }
+
+            assertTrue(repository.awaitLog())
+            assertEquals(
+                "[OMITTED: body exceeds 64-byte limit]",
+                repository.lastApiLog?.requestBody
+            )
+            assertEquals(requestText, server.takeRequest().body.readUtf8())
+        } finally {
+            server.shutdown()
+        }
+    }
+
+    @Test
+    fun `oversized chunked response is omitted without consuming application body`() {
+        val responseBody = "x".repeat(1_024)
+        val server = MockWebServer()
+        server.enqueue(
+            MockResponse()
+                .setHeader("Content-Type", "text/plain")
+                .setChunkedBody(responseBody, 16)
+        )
+        server.start()
+
+        try {
+            val repository = CapturingRepository()
+            val client = client(repository, maxBodyBytes = 64L)
+            val request = Request.Builder().url(server.url("/large-chunked")).build()
+
+            val bodySeenByApplication = client.newCall(request).execute().use { it.body.string() }
+
+            assertEquals(responseBody, bodySeenByApplication)
+            assertTrue(repository.awaitLog())
+            assertEquals(
+                "[OMITTED: body exceeds 64-byte limit]",
+                repository.lastApiLog?.responseBody
+            )
+        } finally {
+            server.shutdown()
+        }
+    }
+
+    @Test
     fun `one shot request body is never read twice`() {
         val server = MockWebServer()
         server.enqueue(

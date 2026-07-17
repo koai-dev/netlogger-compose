@@ -149,7 +149,6 @@ class NetloggerInterceptor internal constructor(
         if (!isTextual(contentType)) return OMITTED_NON_TEXT
 
         val contentLength = runCatching { body.contentLength() }.getOrDefault(-1L)
-        if (contentLength < 0L) return OMITTED_UNKNOWN_LENGTH
         if (contentLength > config.maxBodyBytes) return omittedTooLarge(contentLength)
         if (contentLength == 0L) return null
 
@@ -158,9 +157,9 @@ class NetloggerInterceptor internal constructor(
             private var bytesWritten = 0L
 
             override fun write(source: Buffer, byteCount: Long) {
-//                if (bytesWritten + byteCount > config.maxBodyBytes) {
-//                    throw BodyLimitExceededException()
-//                }
+                if (byteCount > config.maxBodyBytes - bytesWritten) {
+                    throw BodyLimitExceededException()
+                }
                 super.write(source, byteCount)
                 bytesWritten += byteCount
             }
@@ -169,10 +168,11 @@ class NetloggerInterceptor internal constructor(
         return try {
             body.writeTo(limitedSink)
             limitedSink.flush()
+            if (buffer.size == 0L) return null
             val charset = contentType?.charset(StandardCharsets.UTF_8) ?: StandardCharsets.UTF_8
             redactor.redactBody(buffer.readString(charset), contentType?.toString())
         } catch (_: BodyLimitExceededException) {
-            omittedTooLarge(config.maxBodyBytes + 1L)
+            omittedUnknownLengthTooLarge()
         } catch (_: Exception) {
             OMITTED_READ_ERROR
         } finally {
@@ -188,12 +188,21 @@ class NetloggerInterceptor internal constructor(
         if (!isTextual(contentType)) return OMITTED_NON_TEXT
 
         val contentLength = body.contentLength()
-        if (contentLength < 0L) return OMITTED_UNKNOWN_LENGTH
         if (contentLength > config.maxBodyBytes) return omittedTooLarge(contentLength)
         if (contentLength == 0L) return null
 
         return runCatching {
-            val raw = response.peekBody(config.maxBodyBytes).string()
+            val peekByteCount = if (config.maxBodyBytes == Long.MAX_VALUE) {
+                Long.MAX_VALUE
+            } else {
+                config.maxBodyBytes + 1L
+            }
+            val peekedBody = response.peekBody(peekByteCount)
+            if (peekedBody.contentLength() > config.maxBodyBytes) {
+                return@runCatching omittedUnknownLengthTooLarge()
+            }
+            val raw = peekedBody.string()
+            if (raw.isEmpty()) return@runCatching null
             redactor.redactBody(raw, contentType?.toString())
         }.getOrDefault(OMITTED_READ_ERROR)
     }
@@ -246,13 +255,15 @@ class NetloggerInterceptor internal constructor(
     private fun omittedTooLarge(contentLength: Long): String =
         "[OMITTED: body size $contentLength bytes exceeds ${config.maxBodyBytes}-byte limit]"
 
+    private fun omittedUnknownLengthTooLarge(): String =
+        "[OMITTED: body exceeds ${config.maxBodyBytes}-byte limit]"
+
     private class BodyLimitExceededException : IOException()
 
     private companion object {
         const val OMITTED_ONE_SHOT = "[OMITTED: one-shot request body]"
         const val OMITTED_DUPLEX = "[OMITTED: duplex request body]"
         const val OMITTED_NON_TEXT = "[OMITTED: non-text body]"
-        const val OMITTED_UNKNOWN_LENGTH = "[OMITTED: body length is unknown]"
         const val OMITTED_READ_ERROR = "[OMITTED: body could not be read safely]"
         const val MAX_PENDING_LOGS = 64
     }
