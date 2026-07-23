@@ -5,6 +5,8 @@ import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.gestures.detectDragGesturesAfterLongPress
+import androidx.compose.foundation.gestures.scrollBy
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
@@ -17,6 +19,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyRow
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.BasicTextField
@@ -27,11 +30,21 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberUpdatedState
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.hapticfeedback.HapticFeedbackType
+import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.platform.LocalHapticFeedback
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.TextStyle
@@ -43,11 +56,13 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.compose.ui.zIndex
 import androidx.core.net.toUri
 import com.netlogger.lib.R
 import com.netlogger.lib.domain.model.LogEntry
 import com.netlogger.lib.domain.model.LogSeverity
 import com.netlogger.lib.presentation.ui.components.NetloggerIconButton
+import kotlinx.coroutines.delay
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
@@ -193,23 +208,139 @@ internal fun NetloggerSearchBar(
 internal fun FilterChipsRow(
     filters: List<NetloggerFilter>,
     selectedFilter: NetloggerFilter,
-    onFilterSelected: (NetloggerFilter) -> Unit
+    onFilterSelected: (NetloggerFilter) -> Unit,
+    onFilterMoved: (Int, Int) -> Unit = { _, _ -> },
+    onFilterMoveFinished: () -> Unit = {}
 ) {
+    val listState = rememberLazyListState()
+    val currentFilters by rememberUpdatedState(filters)
+    val currentOnFilterMoved by rememberUpdatedState(onFilterMoved)
+    val currentOnFilterMoveFinished by rememberUpdatedState(onFilterMoveFinished)
+    val hapticFeedback = LocalHapticFeedback.current
+    var draggedFilterId by remember { mutableStateOf<String?>(null) }
+    var dragPointerX by remember { mutableStateOf(0f) }
+    var dragTouchOffsetX by remember { mutableStateOf(0f) }
+    var activeDragOrder by remember { mutableStateOf<List<String>>(emptyList()) }
+    var lastMoveTargetId by remember { mutableStateOf<String?>(null) }
+    var autoScrollDirection by remember { mutableStateOf(0) }
+    val density = LocalDensity.current
+    val reorderEdgePx = with(density) { 48.dp.toPx() }
+    val autoScrollStepPx = with(density) { 12.dp.toPx() }
+
+    fun moveDraggedFilterIfNeeded() {
+        val sourceId = draggedFilterId ?: return
+        val visibleItems = listState.layoutInfo.visibleItemsInfo
+        val sourceItem = visibleItems.firstOrNull { it.key == sourceId } ?: return
+        val draggedCenter = dragPointerX - dragTouchOffsetX + sourceItem.size / 2f
+        val targetItem = visibleItems.firstOrNull {
+            it.key != sourceId &&
+                draggedCenter >= it.offset &&
+                draggedCenter <= it.offset + it.size
+        }
+        if (targetItem == null) {
+            lastMoveTargetId = null
+            return
+        }
+
+        val targetId = targetItem.key as? String ?: return
+        if (targetId == lastMoveTargetId) return
+
+        val fromIndex = activeDragOrder.indexOf(sourceId)
+        val toIndex = activeDragOrder.indexOf(targetId)
+        if (fromIndex != -1 && toIndex != -1) {
+            activeDragOrder = activeDragOrder.toMutableList().apply {
+                add(toIndex, removeAt(fromIndex))
+            }
+            lastMoveTargetId = targetId
+            currentOnFilterMoved(fromIndex, toIndex)
+        }
+    }
+
+    LaunchedEffect(draggedFilterId, autoScrollDirection) {
+        while (draggedFilterId != null && autoScrollDirection != 0) {
+            val consumed = listState.scrollBy(autoScrollDirection * autoScrollStepPx)
+            moveDraggedFilterIfNeeded()
+            if (consumed == 0f) break
+            delay(16)
+        }
+    }
+
     LazyRow(
+        state = listState,
         modifier = Modifier
             .fillMaxWidth()
             .padding(start = 16.dp, top = 16.dp, end = 16.dp),
         horizontalArrangement = Arrangement.spacedBy(8.dp),
     ) {
-        filters.forEachIndexed { index, filter ->
+        filters.forEach { filter ->
             val selected = filter == selectedFilter
-            item(key = filter.title + index) {
+            item(key = filter.id) {
+                val isDragging = draggedFilterId == filter.id
                 Text(
                     text = filter.title,
                     color = if (selected) Color.White else Color(0xFF3E494B),
                     fontSize = 14.sp,
                     fontWeight = FontWeight.Black,
                     modifier = Modifier
+                        .zIndex(if (isDragging) 1f else 0f)
+                        .graphicsLayer {
+                            if (isDragging) {
+                                val itemInfo = listState.layoutInfo.visibleItemsInfo
+                                    .firstOrNull { it.key == filter.id }
+                                translationX = itemInfo?.let {
+                                    dragPointerX - it.offset - dragTouchOffsetX
+                                } ?: 0f
+                                scaleX = 1.04f
+                                scaleY = 1.04f
+                                shadowElevation = 8.dp.toPx()
+                            }
+                        }
+                        .pointerInput(filter.id) {
+                            detectDragGesturesAfterLongPress(
+                                onDragStart = { touchOffset ->
+                                    val itemInfo = listState.layoutInfo.visibleItemsInfo
+                                        .firstOrNull { it.key == filter.id }
+                                        ?: return@detectDragGesturesAfterLongPress
+                                    draggedFilterId = filter.id
+                                    dragTouchOffsetX = touchOffset.x
+                                    dragPointerX = itemInfo.offset + touchOffset.x
+                                    activeDragOrder = currentFilters.map(NetloggerFilter::id)
+                                    lastMoveTargetId = null
+                                    autoScrollDirection = 0
+                                    hapticFeedback.performHapticFeedback(
+                                        HapticFeedbackType.LongPress
+                                    )
+                                },
+                                onDrag = { change, dragAmount ->
+                                    change.consume()
+                                    dragPointerX += dragAmount.x
+
+                                    val layoutInfo = listState.layoutInfo
+                                    autoScrollDirection = when {
+                                        dragPointerX <
+                                            layoutInfo.viewportStartOffset + reorderEdgePx -> -1
+                                        dragPointerX >
+                                            layoutInfo.viewportEndOffset - reorderEdgePx -> 1
+                                        else -> 0
+                                    }
+                                    moveDraggedFilterIfNeeded()
+                                },
+                                onDragEnd = {
+                                    draggedFilterId = null
+                                    activeDragOrder = emptyList()
+                                    lastMoveTargetId = null
+                                    autoScrollDirection = 0
+                                    currentOnFilterMoveFinished()
+                                },
+                                onDragCancel = {
+                                    draggedFilterId = null
+                                    activeDragOrder = emptyList()
+                                    lastMoveTargetId = null
+                                    autoScrollDirection = 0
+                                    currentOnFilterMoveFinished()
+                                }
+                            )
+                        }
                         .clip(CircleShape)
                         .background(if (selected) NetloggerListColors.Teal else NetloggerListColors.Chip)
                         .border(1.5.dp, NetloggerListColors.Border, CircleShape)
@@ -488,7 +619,11 @@ private fun NetloggerComponentsPreview2() {
 @Composable
 private fun NetloggerComponentsPreview3() {
     MaterialTheme {
-        FilterChipsRow(NetloggerFilter.defaultFilters, NetloggerFilter.ALL) {}
+        FilterChipsRow(
+            filters = NetloggerFilter.defaultFilters,
+            selectedFilter = NetloggerFilter.ALL,
+            onFilterSelected = {}
+        )
     }
 }
 

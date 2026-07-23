@@ -29,11 +29,12 @@ fun NetloggerListScreen(
     onClose: () -> Unit
 ) {
     val logs by viewModel.logs.collectAsState()
+    val quickFilters by viewModel.quickFilters.collectAsState()
     var showFilterSheet by remember { mutableStateOf(false) }
 
     NetloggerListContent(
         logs = logs,
-        tagTabs = viewModel.tagTabs,
+        quickFilters = quickFilters,
         onLogClicked = onLogClicked,
         onSettingsClick = onOpenSettings,
         onFilterClick = { showFilterSheet = true },
@@ -43,6 +44,8 @@ fun NetloggerListScreen(
             filter.tag?.let(viewModel::filterByTag)
                 ?: viewModel.filterByType(filter.queryValue)
         },
+        onFilterMoved = viewModel::moveFilterTab,
+        onFilterMoveFinished = viewModel::saveFilterTabOrder,
         onClose = onClose
     )
 
@@ -62,20 +65,19 @@ fun NetloggerListScreen(
 @Composable
 internal fun NetloggerListContent(
     logs: List<LogListItem>,
-    tagTabs: List<String> = emptyList(),
+    quickFilters: List<NetloggerFilter> = NetloggerFilter.defaultFilters,
     onLogClicked: (LogEntry, String) -> Unit = { _, _ -> },
     onSettingsClick: () -> Unit = {},
     onFilterClick: () -> Unit = {},
     onClearLogs: () -> Unit = {},
     onSearch: (String) -> Unit = {},
     onFilterSelected: (NetloggerFilter) -> Unit = {},
+    onFilterMoved: (Int, Int) -> Unit = { _, _ -> },
+    onFilterMoveFinished: () -> Unit = {},
     onClose: () -> Unit = {}
 ) {
     var searchQuery by remember { mutableStateOf("") }
     var selectedFilter by remember { mutableStateOf(NetloggerFilter.ALL) }
-    val quickFilters = remember(tagTabs) {
-        NetloggerFilter.defaultFilters + tagTabs.map(NetloggerFilter::forTag)
-    }
     val gson = remember { Gson() }
 
     Scaffold(
@@ -113,7 +115,9 @@ internal fun NetloggerListContent(
                 onFilterSelected = { filter ->
                     selectedFilter = filter
                     onFilterSelected(filter)
-                }
+                },
+                onFilterMoved = onFilterMoved,
+                onFilterMoveFinished = onFilterMoveFinished
             )
             LazyColumn(
                 modifier = Modifier

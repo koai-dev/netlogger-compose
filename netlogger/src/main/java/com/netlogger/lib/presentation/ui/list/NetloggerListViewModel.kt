@@ -4,13 +4,12 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.netlogger.lib.domain.model.LogEntry
 import com.netlogger.lib.domain.model.LogSeverity
+import com.netlogger.lib.domain.repository.SettingsRepository
 import com.netlogger.lib.domain.usecase.ClearLogsUseCase
 import com.netlogger.lib.domain.usecase.GetLogsUseCase
-import com.netlogger.lib.domain.usecase.GetSettingsUseCase
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.collectLatest
-import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 import java.text.SimpleDateFormat
 import java.util.Calendar
@@ -20,10 +19,21 @@ import java.util.Locale
 class NetloggerListViewModel(
     private val getLogsUseCase: GetLogsUseCase,
     private val clearLogsUseCase: ClearLogsUseCase,
-    tagTabs: List<String> = emptyList()
+    tagTabs: List<String> = emptyList(),
+    private val settingsRepository: SettingsRepository? = null
 ) : ViewModel() {
 
     val tagTabs: List<String> = tagTabs.filter(String::isNotBlank).distinct()
+
+    private val availableQuickFilters =
+        NetloggerFilter.defaultFilters + this.tagTabs.map(NetloggerFilter::forTag)
+    private val _quickFilters = MutableStateFlow(
+        restoreFilterOrder(
+            availableFilters = availableQuickFilters,
+            savedIds = settingsRepository?.getFilterTabOrder().orEmpty()
+        )
+    )
+    internal val quickFilters: StateFlow<List<NetloggerFilter>> = _quickFilters
 
     private val _logs = MutableStateFlow<List<LogListItem>>(emptyList())
     val logs: StateFlow<List<LogListItem>> = _logs
@@ -67,6 +77,24 @@ class NetloggerListViewModel(
         currentTypeFilter = null
         currentTagFilter = tag
         applyFilters()
+    }
+
+    fun moveFilterTab(fromIndex: Int, toIndex: Int) {
+        val currentFilters = _quickFilters.value
+        if (fromIndex !in currentFilters.indices ||
+            toIndex !in currentFilters.indices ||
+            fromIndex == toIndex
+        ) {
+            return
+        }
+
+        _quickFilters.value = currentFilters.toMutableList().apply {
+            add(toIndex, removeAt(fromIndex))
+        }
+    }
+
+    fun saveFilterTabOrder() {
+        settingsRepository?.saveFilterTabOrder(_quickFilters.value.map(NetloggerFilter::id))
     }
     
     fun applyAdvancedFilters(methods: Set<String>, statusGroups: Set<String>) {
@@ -189,4 +217,16 @@ internal fun filterByQuickFilter(
         }
         else -> logs.filter { it.type.name == type }
     }
+}
+
+internal fun restoreFilterOrder(
+    availableFilters: List<NetloggerFilter>,
+    savedIds: List<String>
+): List<NetloggerFilter> {
+    val filtersById = availableFilters.associateBy(NetloggerFilter::id)
+    val restoredFilters = savedIds
+        .distinct()
+        .mapNotNull(filtersById::get)
+    val restoredIds = restoredFilters.mapTo(mutableSetOf(), NetloggerFilter::id)
+    return restoredFilters + availableFilters.filterNot { it.id in restoredIds }
 }

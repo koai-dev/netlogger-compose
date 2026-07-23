@@ -120,6 +120,7 @@ LogUtil.info("TAG", "Informational message")
 ```
 These logs will appear in the "General" filter category in the log list. Tags listed in
 `NetloggerConfig.tagTabs` also appear as quick-filter tabs and show matching General logs.
+Long-press and drag any quick-filter tab to reorder it; the order is restored on the next launch.
 
 ## Environment isolation (required)
 

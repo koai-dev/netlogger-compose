@@ -10,6 +10,7 @@ import com.netlogger.lib.domain.repository.SettingsRepository
 import kotlinx.coroutines.channels.awaitClose
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.callbackFlow
+import org.json.JSONArray
 
 class SettingsRepositoryImpl(
     private val context: Context,
@@ -47,6 +48,26 @@ class SettingsRepositoryImpl(
             putBoolean("enable_floating_button", settings.enableFloatingButton && allowFloatingButton)
             apply()
         }
+    }
+
+    override fun getFilterTabOrder(): List<String> {
+        val storedOrder = prefs.getString(FILTER_TAB_ORDER_KEY, null) ?: return emptyList()
+        return runCatching {
+            val jsonArray = JSONArray(storedOrder)
+            buildList {
+                repeat(jsonArray.length()) { index ->
+                    jsonArray.optString(index)
+                        .takeIf(String::isNotBlank)
+                        ?.let(::add)
+                }
+            }
+        }.getOrDefault(emptyList())
+    }
+
+    override fun saveFilterTabOrder(tabIds: List<String>) {
+        prefs.edit()
+            .putString(FILTER_TAB_ORDER_KEY, JSONArray(tabIds).toString())
+            .apply()
     }
 
     private fun readSettings(): LogSettings {
@@ -93,5 +114,6 @@ class SettingsRepositoryImpl(
         const val MIN_SENSITIVITY = 1.0f
         const val MAX_SENSITIVITY = 5.0f
         const val DEFAULT_SENSITIVITY = 2.0f
+        const val FILTER_TAB_ORDER_KEY = "filter_tab_order"
     }
 }

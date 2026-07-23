@@ -36,6 +36,36 @@ class NetloggerListViewModelTest {
         assertEquals(listOf(generalApiTag), result)
     }
 
+    @Test
+    fun `saved tab order is restored and newly configured tabs are appended`() {
+        val authFilter = NetloggerFilter.forTag("Auth")
+        val databaseFilter = NetloggerFilter.forTag("Database")
+        val availableFilters = NetloggerFilter.defaultFilters + authFilter + databaseFilter
+
+        val result = restoreFilterOrder(
+            availableFilters = availableFilters,
+            savedIds = listOf(
+                authFilter.id,
+                NetloggerFilter.ERROR.id,
+                "tag:Removed",
+                authFilter.id,
+                NetloggerFilter.ALL.id
+            )
+        )
+
+        assertEquals(
+            listOf(
+                authFilter,
+                NetloggerFilter.ERROR,
+                NetloggerFilter.ALL,
+                NetloggerFilter.API,
+                NetloggerFilter.GENERAL,
+                databaseFilter
+            ),
+            result
+        )
+    }
+
     private fun generalLog(tag: String) = LogEntry.General(
         tag = tag,
         message = "message",

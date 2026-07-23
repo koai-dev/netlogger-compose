@@ -117,7 +117,8 @@ internal fun createNetloggerModule(
         NetloggerListViewModel(
             getLogsUseCase = get(),
             clearLogsUseCase = get(),
-            tagTabs = currentConfig.tagTabs
+            tagTabs = currentConfig.tagTabs,
+            settingsRepository = get()
         )
     }
     viewModel { NetloggerSettingsViewModel(get(), get()) }

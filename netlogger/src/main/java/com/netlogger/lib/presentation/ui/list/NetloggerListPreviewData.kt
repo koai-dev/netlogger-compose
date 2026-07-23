@@ -4,19 +4,24 @@ import com.netlogger.lib.domain.model.LogEntry
 import com.netlogger.lib.domain.model.LogSeverity
 
 internal data class NetloggerFilter(
+    val id: String,
     val title: String,
     val queryValue: String? = null,
     val tag: String? = null
 ) {
     companion object {
-        val ALL = NetloggerFilter("All", queryValue = "ALL")
-        val API = NetloggerFilter("API", queryValue = "API")
-        val GENERAL = NetloggerFilter("General", queryValue = "GENERAL")
-        val ERROR = NetloggerFilter("Error", queryValue = "ERROR")
+        val ALL = NetloggerFilter("type:all", "All", queryValue = "ALL")
+        val API = NetloggerFilter("type:api", "API", queryValue = "API")
+        val GENERAL = NetloggerFilter("type:general", "General", queryValue = "GENERAL")
+        val ERROR = NetloggerFilter("type:error", "Error", queryValue = "ERROR")
 
         val defaultFilters = listOf(ALL, API, GENERAL, ERROR)
 
-        fun forTag(tag: String) = NetloggerFilter(title = tag, tag = tag)
+        fun forTag(tag: String) = NetloggerFilter(
+            id = "tag:$tag",
+            title = tag,
+            tag = tag
+        )
     }
 }
 
