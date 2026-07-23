@@ -3,6 +3,7 @@ package com.netlogger.lib.presentation.ui.list
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.netlogger.lib.domain.model.LogEntry
+import com.netlogger.lib.domain.model.LogSeverity
 import com.netlogger.lib.domain.usecase.ClearLogsUseCase
 import com.netlogger.lib.domain.usecase.GetLogsUseCase
 import com.netlogger.lib.domain.usecase.GetSettingsUseCase
@@ -18,8 +19,11 @@ import java.util.Locale
 
 class NetloggerListViewModel(
     private val getLogsUseCase: GetLogsUseCase,
-    private val clearLogsUseCase: ClearLogsUseCase
+    private val clearLogsUseCase: ClearLogsUseCase,
+    tagTabs: List<String> = emptyList()
 ) : ViewModel() {
+
+    val tagTabs: List<String> = tagTabs.filter(String::isNotBlank).distinct()
 
     private val _logs = MutableStateFlow<List<LogListItem>>(emptyList())
     val logs: StateFlow<List<LogListItem>> = _logs
@@ -27,6 +31,7 @@ class NetloggerListViewModel(
     private var allLogs: List<LogEntry> = emptyList()
     private var currentQuery = ""
     private var currentTypeFilter: String? = null
+    private var currentTagFilter: String? = null
     
     // Advanced filters
     private var selectedMethods: Set<String> = emptySet()
@@ -54,6 +59,13 @@ class NetloggerListViewModel(
 
     fun filterByType(type: String?) {
         currentTypeFilter = type
+        currentTagFilter = null
+        applyFilters()
+    }
+
+    fun filterByTag(tag: String) {
+        currentTypeFilter = null
+        currentTagFilter = tag
         applyFilters()
     }
     
@@ -64,15 +76,11 @@ class NetloggerListViewModel(
     }
 
     private fun applyFilters() {
-        var filtered = allLogs
-        
-        // Type filter (All, Api, General, Error)
-        if (currentTypeFilter != null && currentTypeFilter != "ALL") {
-            filtered = when (currentTypeFilter) {
-                "ERROR" -> filtered.filter { it.isErrorLog() }
-                else -> filtered.filter { it.type.name == currentTypeFilter }
-            }
-        }
+        var filtered = filterByQuickFilter(
+            logs = allLogs,
+            type = currentTypeFilter,
+            tag = currentTagFilter
+        )
         
         // Search query
         if (currentQuery.isNotBlank()) {
@@ -144,11 +152,6 @@ class NetloggerListViewModel(
         return result
     }
 
-    private fun LogEntry.isErrorLog(): Boolean = when (this) {
-        is LogEntry.Api -> statusCode !in 200..299
-        is LogEntry.General -> level.name == "ERROR"
-    }
-
     private fun isSameDay(cal1: Calendar, cal2: Calendar): Boolean {
         return cal1.get(Calendar.YEAR) == cal2.get(Calendar.YEAR) &&
                 cal1.get(Calendar.DAY_OF_YEAR) == cal2.get(Calendar.DAY_OF_YEAR)
@@ -162,4 +165,28 @@ class NetloggerListViewModel(
     
     fun getSelectedMethods() = selectedMethods
     fun getSelectedStatusGroups() = selectedStatusGroups
+}
+
+internal fun filterByQuickFilter(
+    logs: List<LogEntry>,
+    type: String?,
+    tag: String?
+): List<LogEntry> {
+    if (tag != null) {
+        return logs.filter { log ->
+            log is LogEntry.General && log.tag == tag
+        }
+    }
+
+    if (type == null || type == "ALL") return logs
+
+    return when (type) {
+        "ERROR" -> logs.filter { log ->
+            when (log) {
+                is LogEntry.Api -> log.statusCode !in 200..299
+                is LogEntry.General -> log.level == LogSeverity.ERROR
+            }
+        }
+        else -> logs.filter { it.type.name == type }
+    }
 }

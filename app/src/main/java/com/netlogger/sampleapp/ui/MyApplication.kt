@@ -16,6 +16,7 @@ class MyApplication : Application() {
             captureGeneralLogs = true,
             allowShakeDetector = true,
             maximumLogLevel = LogLevel.ALL,
+            tagTabs = listOf("abc"),
             enableLogcatOutput = BuildConfig.DEBUG
         ))
         LogUtil.log("abc", "ấnkdnaksd")

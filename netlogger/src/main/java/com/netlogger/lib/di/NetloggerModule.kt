@@ -112,7 +112,14 @@ internal fun createNetloggerModule(
         onClose { manager -> (manager as? NetloggerManagerImpl)?.close() }
     }
 
-    viewModel { NetloggerListViewModel(get(), get()) }
+    viewModel {
+        val currentConfig = get<NetloggerConfig>(NETLOGGER_CONFIG_QUALIFIER)
+        NetloggerListViewModel(
+            getLogsUseCase = get(),
+            clearLogsUseCase = get(),
+            tagTabs = currentConfig.tagTabs
+        )
+    }
     viewModel { NetloggerSettingsViewModel(get(), get()) }
 }
 

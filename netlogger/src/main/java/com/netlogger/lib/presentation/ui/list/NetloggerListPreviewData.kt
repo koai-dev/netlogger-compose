@@ -3,11 +3,21 @@ package com.netlogger.lib.presentation.ui.list
 import com.netlogger.lib.domain.model.LogEntry
 import com.netlogger.lib.domain.model.LogSeverity
 
-internal enum class NetloggerFilter(val title: String, val queryValue: String?) {
-    ALL("All", "ALL"),
-    API("API", "API"),
-    GENERAL("General", "GENERAL"),
-    ERROR("Error", "ERROR")
+internal data class NetloggerFilter(
+    val title: String,
+    val queryValue: String? = null,
+    val tag: String? = null
+) {
+    companion object {
+        val ALL = NetloggerFilter("All", queryValue = "ALL")
+        val API = NetloggerFilter("API", queryValue = "API")
+        val GENERAL = NetloggerFilter("General", queryValue = "GENERAL")
+        val ERROR = NetloggerFilter("Error", queryValue = "ERROR")
+
+        val defaultFilters = listOf(ALL, API, GENERAL, ERROR)
+
+        fun forTag(tag: String) = NetloggerFilter(title = tag, tag = tag)
+    }
 }
 
 internal fun sampleLogListItems(): List<LogListItem> = listOf(

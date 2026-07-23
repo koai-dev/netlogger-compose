@@ -33,12 +33,16 @@ fun NetloggerListScreen(
 
     NetloggerListContent(
         logs = logs,
+        tagTabs = viewModel.tagTabs,
         onLogClicked = onLogClicked,
         onSettingsClick = onOpenSettings,
         onFilterClick = { showFilterSheet = true },
         onClearLogs = viewModel::clearLogs,
         onSearch = viewModel::search,
-        onFilterSelected = viewModel::filterByType,
+        onFilterSelected = { filter ->
+            filter.tag?.let(viewModel::filterByTag)
+                ?: viewModel.filterByType(filter.queryValue)
+        },
         onClose = onClose
     )
 
@@ -58,16 +62,20 @@ fun NetloggerListScreen(
 @Composable
 internal fun NetloggerListContent(
     logs: List<LogListItem>,
+    tagTabs: List<String> = emptyList(),
     onLogClicked: (LogEntry, String) -> Unit = { _, _ -> },
     onSettingsClick: () -> Unit = {},
     onFilterClick: () -> Unit = {},
     onClearLogs: () -> Unit = {},
     onSearch: (String) -> Unit = {},
-    onFilterSelected: (String?) -> Unit = {},
+    onFilterSelected: (NetloggerFilter) -> Unit = {},
     onClose: () -> Unit = {}
 ) {
     var searchQuery by remember { mutableStateOf("") }
     var selectedFilter by remember { mutableStateOf(NetloggerFilter.ALL) }
+    val quickFilters = remember(tagTabs) {
+        NetloggerFilter.defaultFilters + tagTabs.map(NetloggerFilter::forTag)
+    }
     val gson = remember { Gson() }
 
     Scaffold(
@@ -100,10 +108,11 @@ internal fun NetloggerListContent(
                 onFilterClick = onFilterClick
             )
             FilterChipsRow(
+                filters = quickFilters,
                 selectedFilter = selectedFilter,
                 onFilterSelected = { filter ->
                     selectedFilter = filter
-                    onFilterSelected(filter.queryValue)
+                    onFilterSelected(filter)
                 }
             )
             LazyColumn(

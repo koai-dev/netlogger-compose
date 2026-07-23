@@ -80,6 +80,7 @@ class MyApp : Application() {
                 enableLogcatOutput = true,
                 allowShakeDetector = true,
                 allowFloatingButton = true,
+                tagTabs = listOf("AuthModule", "Database"),
                 storage = NetloggerStorage.MEMORY_ONLY,
                 maxBodyBytes = 256 * 1024L,
                 maxLogEntries = 500,
@@ -117,7 +118,8 @@ LogUtil.debug("TAG", "Your message here")
 LogUtil.error("TAG", "Something went wrong")
 LogUtil.info("TAG", "Informational message")
 ```
-These logs will appear in the "General" filter category in the log list.
+These logs will appear in the "General" filter category in the log list. Tags listed in
+`NetloggerConfig.tagTabs` also appear as quick-filter tabs and show matching General logs.
 
 ## Environment isolation (required)
 

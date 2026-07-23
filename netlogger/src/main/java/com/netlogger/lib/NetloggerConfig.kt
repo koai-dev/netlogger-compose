@@ -23,7 +23,9 @@ data class NetloggerConfig(
     val allowFloatingButton: Boolean = false,
     val additionalRedactedHeaders: Set<String> = emptySet(),
     val additionalRedactedQueryParameters: Set<String> = emptySet(),
-    val additionalRedactedBodyFields: Set<String> = emptySet()
+    val additionalRedactedBodyFields: Set<String> = emptySet(),
+    /** General-log tags shown as quick-filter tabs, in the provided order. */
+    val tagTabs: List<String> = emptyList()
 ) {
     init {
 //        require(maxBodyBytes in 1..MAX_ALLOWED_BODY_BYTES) {

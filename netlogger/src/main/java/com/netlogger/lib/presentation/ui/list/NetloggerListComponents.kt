@@ -1,5 +1,6 @@
 package com.netlogger.lib.presentation.ui.list
 
+import android.annotation.SuppressLint
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -8,7 +9,6 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -16,6 +16,7 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.BasicTextField
@@ -190,30 +191,32 @@ internal fun NetloggerSearchBar(
 
 @Composable
 internal fun FilterChipsRow(
+    filters: List<NetloggerFilter>,
     selectedFilter: NetloggerFilter,
     onFilterSelected: (NetloggerFilter) -> Unit
 ) {
-    FlowRow(
+    LazyRow(
         modifier = Modifier
             .fillMaxWidth()
             .padding(start = 16.dp, top = 16.dp, end = 16.dp),
         horizontalArrangement = Arrangement.spacedBy(8.dp),
-        verticalArrangement = Arrangement.spacedBy(8.dp)
     ) {
-        NetloggerFilter.entries.forEach { filter ->
+        filters.forEachIndexed { index, filter ->
             val selected = filter == selectedFilter
-            Text(
-                text = filter.title,
-                color = if (selected) Color.White else Color(0xFF3E494B),
-                fontSize = 14.sp,
-                fontWeight = FontWeight.Black,
-                modifier = Modifier
-                    .clip(CircleShape)
-                    .background(if (selected) NetloggerListColors.Teal else NetloggerListColors.Chip)
-                    .border(1.5.dp, NetloggerListColors.Border, CircleShape)
-                    .clickable { onFilterSelected(filter) }
-                    .padding(horizontal = 16.dp, vertical = 8.dp)
-            )
+            item(key = filter.title + index) {
+                Text(
+                    text = filter.title,
+                    color = if (selected) Color.White else Color(0xFF3E494B),
+                    fontSize = 14.sp,
+                    fontWeight = FontWeight.Black,
+                    modifier = Modifier
+                        .clip(CircleShape)
+                        .background(if (selected) NetloggerListColors.Teal else NetloggerListColors.Chip)
+                        .border(1.5.dp, NetloggerListColors.Border, CircleShape)
+                        .clickable { onFilterSelected(filter) }
+                        .padding(horizontal = 16.dp, vertical = 8.dp)
+                )
+            }
         }
     }
 }
@@ -386,6 +389,7 @@ private fun MetaText(text: String) {
     )
 }
 
+@SuppressLint("UnusedBoxWithConstraintsScope")
 @Composable
 private fun StartEllipsizedText(
     text: String,
@@ -484,7 +488,7 @@ private fun NetloggerComponentsPreview2() {
 @Composable
 private fun NetloggerComponentsPreview3() {
     MaterialTheme {
-        FilterChipsRow(NetloggerFilter.ALL) {}
+        FilterChipsRow(NetloggerFilter.defaultFilters, NetloggerFilter.ALL) {}
     }
 }
 
