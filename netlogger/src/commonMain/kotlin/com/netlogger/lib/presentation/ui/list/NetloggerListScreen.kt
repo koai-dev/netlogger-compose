@@ -1,0 +1,146 @@
+package com.netlogger.lib.presentation.ui.list
+
+import androidx.compose.foundation.background
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.itemsIndexed
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Scaffold
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.tooling.preview.Preview
+import androidx.compose.ui.unit.dp
+import com.netlogger.lib.platform.encodeLog
+import com.netlogger.lib.domain.model.LogEntry
+import com.netlogger.lib.presentation.ui.filter.NetloggerFilterBottomSheet
+
+@Composable
+fun NetloggerListScreen(
+    viewModel: NetloggerListViewModel,
+    onLogClicked: (LogEntry, String) -> Unit,
+    onOpenSettings: () -> Unit,
+    onClose: () -> Unit
+) {
+    val logs by viewModel.logs.collectAsState()
+    val quickFilters by viewModel.quickFilters.collectAsState()
+    var showFilterSheet by remember { mutableStateOf(false) }
+
+    NetloggerListContent(
+        logs = logs,
+        quickFilters = quickFilters,
+        onLogClicked = onLogClicked,
+        onSettingsClick = onOpenSettings,
+        onFilterClick = { showFilterSheet = true },
+        onClearLogs = viewModel::clearLogs,
+        onSearch = viewModel::search,
+        onFilterSelected = { filter ->
+            filter.tag?.let(viewModel::filterByTag)
+                ?: viewModel.filterByType(filter.queryValue)
+        },
+        onFilterMoved = viewModel::moveFilterTab,
+        onFilterMoveFinished = viewModel::saveFilterTabOrder,
+        onClose = onClose
+    )
+
+    if (showFilterSheet) {
+        NetloggerFilterBottomSheet(
+            initialMethods = viewModel.getSelectedMethods(),
+            initialStatus = viewModel.getSelectedStatusGroups(),
+            onApply = { methods, status ->
+                viewModel.applyAdvancedFilters(methods, status)
+                showFilterSheet = false
+            },
+            onDismiss = { showFilterSheet = false }
+        )
+    }
+}
+
+@Composable
+internal fun NetloggerListContent(
+    logs: List<LogListItem>,
+    quickFilters: List<NetloggerFilter> = NetloggerFilter.defaultFilters,
+    onLogClicked: (LogEntry, String) -> Unit = { _, _ -> },
+    onSettingsClick: () -> Unit = {},
+    onFilterClick: () -> Unit = {},
+    onClearLogs: () -> Unit = {},
+    onSearch: (String) -> Unit = {},
+    onFilterSelected: (NetloggerFilter) -> Unit = {},
+    onFilterMoved: (Int, Int) -> Unit = { _, _ -> },
+    onFilterMoveFinished: () -> Unit = {},
+    onClose: () -> Unit = {}
+) {
+    var searchQuery by remember { mutableStateOf("") }
+    var selectedFilter by remember { mutableStateOf(NetloggerFilter.ALL) }
+
+    Scaffold(
+        topBar = {
+            NetloggerHeader(
+                onClearLogs = onClearLogs,
+                onSettingsClick = onSettingsClick,
+                onClose = onClose
+            )
+        },
+        containerColor = NetloggerListColors.Screen
+    ) { paddingValues ->
+        Column(
+            modifier = Modifier
+                .padding(paddingValues)
+                .fillMaxSize()
+                .padding(16.dp)
+                .background(NetloggerListColors.Screen)
+        ) {
+            NetloggerSearchBar(
+                query = searchQuery,
+                onQueryChanged = {
+                    searchQuery = it
+                    onSearch(it)
+                },
+                onClearQuery = {
+                    searchQuery = ""
+                    onSearch("")
+                },
+                onFilterClick = onFilterClick
+            )
+            FilterChipsRow(
+                filters = quickFilters,
+                selectedFilter = selectedFilter,
+                onFilterSelected = { filter ->
+                    selectedFilter = filter
+                    onFilterSelected(filter)
+                },
+                onFilterMoved = onFilterMoved,
+                onFilterMoveFinished = onFilterMoveFinished
+            )
+            LazyColumn(
+                modifier = Modifier
+                    .fillMaxSize()
+            ) {
+                itemsIndexed(logs, key = { index, item -> index }) { index, item ->
+                    when (item) {
+                        is LogListItem.DateHeader -> DateHeader(item.dateLabel)
+                        is LogListItem.LogItem -> LogEntryCard(
+                            log = item.log,
+                            onClick = { onLogClicked(it, encodeLog(it)) }
+                        )
+                    }
+                }
+            }
+        }
+    }
+}
+
+
+@Preview
+@Composable
+private fun NetloggerListContentPreview() {
+    MaterialTheme {
+        NetloggerListContent(logs = sampleLogListItems())
+    }
+}

@@ -1,130 +1,84 @@
+import org.jetbrains.kotlin.gradle.dsl.JvmTarget
+
 plugins {
-    alias(libs.plugins.android.library)
+    alias(libs.plugins.kotlin.multiplatform)
+    alias(libs.plugins.android.kmp.library)
+    alias(libs.plugins.compose.multiplatform)
     alias(libs.plugins.kotlin.compose)
+    alias(libs.plugins.kotlin.serialization)
     id("com.google.devtools.ksp")
     id("maven-publish")
 }
 
-android {
-    namespace = "com.netlogger.lib"
-    compileSdk {
-        version = release(36) {
-            minorApiLevel = 1
-        }
-    }
+group = "com.koai"
+version = "1.5.0"
 
-    defaultConfig {
+kotlin {
+    compilerOptions.freeCompilerArgs.add("-Xexpect-actual-classes")
+    android {
+        namespace = "com.netlogger.lib"
+        compileSdk = 36
         minSdk = 24
-
-        testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
-        consumerProguardFiles("consumer-rules.pro")
+        androidResources.enable = true
+        compilerOptions.jvmTarget.set(JvmTarget.JVM_21)
+        withHostTest {}
+        withDeviceTest { instrumentationRunner = "androidx.test.runner.AndroidJUnitRunner" }
     }
-
-    buildTypes {
-        release {
-            isMinifyEnabled = false
-            proguardFiles(
-                getDefaultProguardFile("proguard-android-optimize.txt"),
-                "proguard-rules.pro"
-            )
+    listOf(iosArm64(), iosSimulatorArm64()).forEach { target ->
+        target.binaries.framework {
+            baseName = "Netlogger"
+            isStatic = true
         }
     }
-    compileOptions {
-        sourceCompatibility = JavaVersion.VERSION_21
-        targetCompatibility = JavaVersion.VERSION_21
-    }
-    publishing {
-        singleVariant("release") {
-            withSourcesJar()
-            withJavadocJar()
+    sourceSets {
+        commonMain.dependencies {
+            implementation(libs.compose.multiplatform.runtime)
+            implementation(libs.compose.multiplatform.foundation)
+            implementation(libs.compose.multiplatform.material3)
+            implementation(libs.compose.multiplatform.ui)
+            implementation(libs.compose.multiplatform.resources)
+            implementation(libs.compose.multiplatform.preview)
+            implementation(libs.compose.multiplatform.icons)
+            implementation(libs.multiplatform.lifecycle.viewmodel)
+            implementation(libs.kotlinx.coroutines.core)
+            implementation(libs.kotlinx.serialization.json)
+            implementation(libs.androidx.room.runtime)
+            implementation(libs.androidx.sqlite.bundled)
+            api(libs.ktor.client.core)
         }
-    }
-}
-val libVersion = "1.4.6"
-afterEvaluate {
-    publishing {
-        publications {
-            register<MavenPublication>("release") {
-                groupId = "com.koai"
-                artifactId = "netlogger-compose"
-                version = libVersion
-
-                afterEvaluate {
-                    from(components["release"])
-                }
-            }
+        commonTest.dependencies {
+            implementation(kotlin("test"))
+            implementation(libs.ktor.client.mock)
         }
+        androidMain.dependencies {
+            implementation(libs.androidx.core.ktx)
+            implementation(libs.androidx.activity.compose)
+            implementation(libs.androidx.lifecycle.runtime.ktx)
+            implementation(libs.material)
+            implementation(libs.koin.android)
+            implementation(libs.kotlinx.coroutines.android)
+            api(libs.okhttp)
+        }
+        getByName("androidHostTest").dependencies {
+            implementation(libs.junit)
+            implementation(libs.gson)
+            implementation(libs.okhttp.mockwebserver)
+        }
+        getByName("androidDeviceTest").dependencies {
+            implementation(libs.androidx.junit)
+            implementation(libs.androidx.espresso.core)
+        }
+        iosMain.dependencies { implementation(libs.ktor.client.darwin) }
     }
 }
 
-ksp {
-    arg("room.schemaLocation", "$projectDir/schemas")
-}
+compose.resources { packageOfResClass = "com.netlogger.lib.resources" }
 
+ksp { arg("room.schemaLocation", "$projectDir/schemas") }
 dependencies {
-    implementation(libs.androidx.core.ktx)
-    implementation(libs.androidx.lifecycle.runtime.ktx)
-    implementation(libs.androidx.activity.compose)
-    implementation(platform(libs.androidx.compose.bom))
-    implementation(libs.androidx.compose.ui)
-    implementation(libs.androidx.compose.ui.graphics)
-    implementation(libs.androidx.compose.ui.tooling.preview)
-    implementation(libs.androidx.material3)
-    implementation(libs.material)
-    implementation(libs.koin.android)
-    testImplementation(libs.junit)
-    testImplementation(libs.okhttp.mockwebserver)
-    androidTestImplementation(libs.androidx.junit)
-    androidTestImplementation(libs.androidx.espresso.core)
-    androidTestImplementation(platform(libs.androidx.compose.bom))
-    androidTestImplementation(libs.androidx.compose.ui.test.junit4)
-    debugImplementation(libs.androidx.compose.ui.tooling)
-    debugImplementation(libs.androidx.compose.ui.test.manifest)
-
-    // Room
-    implementation(libs.androidx.room.runtime)
-    ksp(libs.androidx.room.compiler)
-    implementation(libs.androidx.room.ktx)
-
-    // ViewModel & Coroutines
-    implementation(libs.androidx.lifecycle.viewmodel.ktx)
-    implementation(libs.kotlinx.coroutines.android)
-
-    // Gson
-    implementation(libs.gson)
-
-    // OkHttp
-    api(libs.okhttp)
-
-    // Icons
-    implementation(libs.androidx.compose.material.icons.extended)
+    add("kspAndroid", libs.androidx.room.compiler)
+    add("kspIosArm64", libs.androidx.room.compiler)
+    add("kspIosSimulatorArm64", libs.androidx.room.compiler)
 }
 
-tasks.register("localBuild") {
-    dependsOn("assembleRelease")
-}
-
-tasks.register("createReleaseTag") {
-    doLast {
-        val tagName = "v$libVersion"
-        try {
-            logger.lifecycle("Creating tag: $tagName")
-
-            providers
-                .exec {
-                    commandLine("git", "tag", "-a", tagName, "-m", "Release tag $tagName")
-                }.result
-                .get()
-
-            providers
-                .exec {
-                    commandLine("git", "push", "origin", tagName)
-                }.result
-                .get()
-
-            logger.lifecycle("Successfully created and pushed tag: $tagName")
-        } catch (e: Exception) {
-            throw GradleException("Failed to create/push tag $tagName", e)
-        }
-    }
-}
+tasks.register("localBuild") { dependsOn("assemble", "linkDebugFrameworkIosSimulatorArm64") }

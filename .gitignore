@@ -14,3 +14,7 @@
 .cxx
 local.properties
 /.kotlin
+
+**/build/
+iosApp/DerivedData/
+**/xcuserdata/

@@ -1,66 +1,71 @@
 # Netlogger Compose
 
-A powerful and beautiful network logging library for Android, built with Jetpack Compose and Clean Architecture.
+A network logging library for Android and iOS, built with Kotlin Multiplatform, Compose Multiplatform, Room, and Clean Architecture.
 
 ## Features
 - **Real-time Logging**: Intercept and view all network requests and responses.
 - **Beautiful JSON Viewer**: Expandable/collapsible JSON tree with syntax highlighting.
 - **Global Search**: Search for any text in log details (URLs, Headers, Bodies) with navigation arrows.
 - **Advanced Filtering**: Filter logs by Method (GET, POST, etc.) and Status Code (2xx, 4xx, etc.).
-- **Shake to Open**: Instantly open the log list by shaking your device.
-- **Floating Button**: Optional floating shortcut for quick access.
+- **Shake to Open (Android)**: Instantly open the log list by shaking your device.
+- **Floating Button (Android)**: Optional floating shortcut for quick access.
 - **cURL Export**: Easily copy any request as a cURL command.
 - **Auto-reset**: Configurable option to clear old logs on app startup.
 
-## Installation
-[![](https://jitpack.io/v/koai-dev/netlogger-compose.svg)](https://jitpack.io/#koai-dev/netlogger-compose)
-### Step 1. Add the JitPack repository to your build file
+## Project structure and local builds
 
-Add it in your root `settings.gradle` or `settings.gradle.kts` at the end of repositories:
+- `netlogger/src/commonMain`: shared models, use cases, Room schema/DAO/repository, redaction, Ktor capture, Compose screens and ViewModels.
+- `netlogger/src/androidMain`: Android initialization, Koin integration, OkHttp interceptor, SharedPreferences, activity, shake/FAB and clipboard/console adapters.
+- `netlogger/src/iosMain`: Darwin integration, Room database builder, NSUserDefaults settings, UIKit controllers and clipboard/console adapters.
+- `app`: Android sample application.
+- `iosApp/NetloggerSample.xcodeproj`: iOS sample application hosting shared Compose UI.
+- `commonTest`, `androidHostTest`, `iosTest`: shared capture/redaction tests, Android compatibility tests, and native Room storage tests.
 
-**Groovy (settings.gradle):**
-```gradle
-dependencyResolutionManagement {
-    repositoriesMode.set(RepositoriesMode.FAIL_ON_PROJECT_REPOS)
-    repositories {
-        mavenCentral()
-        maven { url 'https://jitpack.io' }
-    }
-}
+Requirements: JDK 21, Android SDK 36 and 36.1, macOS with full Xcode and an iOS Simulator runtime. The iOS minimum deployment target is 16.0; Android minSdk is 24. Native targets are `iosArm64` (devices) and `iosSimulatorArm64` (Apple Silicon simulators).
+
+```bash
+# Android APKs and host tests
+./gradlew :app:assembleDebug :app:assembleRelease :netlogger:testAndroidHostTest
+
+# iOS frameworks and native tests
+export DEVELOPER_DIR=/Applications/Xcode.app/Contents/Developer
+./gradlew :netlogger:linkDebugFrameworkIosArm64 :netlogger:linkDebugFrameworkIosSimulatorArm64 :netlogger:iosSimulatorArm64Test
+
+# Both platforms, including Debug/Release iOS sample builds
+./scripts/verify-builds.sh
+
+# On machines with limited disk space, remove framework intermediates after each build
+NETLOGGER_CLEAN_FRAMEWORK_OUTPUTS=1 ./scripts/verify-builds.sh
 ```
 
-**Kotlin DSL (settings.gradle.kts):**
+Open `iosApp/NetloggerSample.xcodeproj` in Xcode and select the `NetloggerSample` scheme. Its build phase runs `embedAndSignAppleFrameworkForXcode`; Gradle chooses the device/simulator and Debug/Release framework from Xcode's environment. For running on a physical device, set your development team in Xcode. The verification script compiles device apps without signing and does not produce a distribution archive. The host `Info.plist` must set `CADisableMinimumFrameDurationOnPhone` to `true` for Compose iOS; the sample includes this required setting.
+
+This migration is version `1.5.0` in the source tree; it has not been published. Consume the local module with `implementation(project(":netlogger"))` in a KMP source set, or `debugImplementation(project(":netlogger"))` in an Android host. `./gradlew :netlogger:publishToMavenLocal` publishes KMP metadata and platform artifacts under `com.koai:netlogger:1.5.0`. Older JitPack releases are Android-only.
+
+## Ktor and iOS usage
+
+Initialize on the main thread before creating the client or viewer:
+
 ```kotlin
-dependencyResolutionManagement {
-    repositoriesMode.set(RepositoriesMode.FAIL_ON_PROJECT_REPOS)
-    repositories {
-        mavenCentral()
-        maven { url = uri("https://jitpack.io") }
-    }
+// iOS Kotlin host
+Netlogger.init(NetloggerConfig(
+    maximumLogLevel = LogLevel.ALL,
+    captureBodies = true,
+    captureGeneralLogs = true
+))
+val client = HttpClient(Darwin) {
+    Netlogger.configureClient(this)
 }
+val controller = NetloggerViewController(onClose = { /* dismiss from host */ })
 ```
 
-### Step 2. Add the dependency only to an approved environment
+On Android, call `Netlogger.init(application, config)` before `Netlogger.configureClient(this)` in a Ktor client. The existing `Netlogger.getInterceptor()` API remains available for OkHttp. Install one capture adapter per client to avoid duplicate entries.
 
-Add the following to your app-level `build.gradle` or `build.gradle.kts`:
+For a common Kotlin host that owns its own repositories, the `com.netlogger.lib.network.netlogger` extension accepts the configuration, `SettingsRepository`, and `INetloggerRepository` directly. The application retains ownership of its HTTP client and should close it normally.
 
-**Groovy (build.gradle):**
-```gradle
-dependencies {
-    debugImplementation 'com.github.koai-dev:netlogger-compose:<version>'
-}
-```
+Ktor captures bounded `TextContent` request bodies and known-length textual response bodies when body capture is approved. Binary, compressed, unknown-length and oversized response bodies, and streaming/upload request bodies, are omitted. The original response bytes remain available to the caller; captured values are redacted before entering the bounded queue. API logging and body capture always respect both configured caps and current settings.
 
-**Kotlin DSL (build.gradle.kts):**
-```kotlin
-dependencies {
-    debugImplementation("com.github.koai-dev:netlogger-compose:<version>")
-}
-```
-
-For a custom internal or QA flavor, use the matching configuration instead, for example
-`internalImplementation` or `qaImplementation`. Do not use the unscoped `implementation`
-configuration unless the target environment has explicitly approved network logging.
+The shared viewer supports list/detail, JSON expansion, search, filters, tab ordering, settings and cURL export on both platforms. Shake/FAB shortcuts and screenshot blocking through `secureWindow` are Android-specific; iOS settings hide those shortcuts. iOS has no equivalent to Android `FLAG_SECURE`, so `secureWindow` does not prevent iOS screenshots. iOS copies use a local-only pasteboard entry that expires after two minutes. `PERSISTENT_NO_BACKUP` uses an Application Support directory excluded from iCloud backup on iOS; memory storage is the default on both platforms.
 
 ## Usage
 
@@ -103,7 +108,7 @@ val okHttpClient = OkHttpClient.Builder()
 ### 3. Open Netlogger
 There are three ways to open the Netlogger UI:
 - **Shake Device**: opt in through `NetloggerConfig` or enable it in Settings.
-- **Floating Button**: opt in through `NetloggerConfig` or enable it in Settings.
+- **Floating Button (Android)**: opt in through `NetloggerConfig` or enable it in Settings.
 - **Manual Launch**:
   ```kotlin
   val intent = Intent(context, NetloggerActivity::class.java)
@@ -189,7 +194,7 @@ Calling `Netlogger.init(application)` without a configuration is safe by default
 - Logs are held in memory only.
 - Logcat output is disabled by default.
 - Shake and floating-button entry points are disabled.
-- The Netlogger window blocks screenshots and non-secure displays.
+- The Android Netlogger window blocks screenshots and non-secure displays.
 - Authorization, cookies, common token/query names, credentials and configured custom fields are redacted.
 - Bodies, messages, retained entries and retention duration have hard upper bounds.
 
@@ -206,7 +211,7 @@ Console output uses the same bounded capture as the UI and is redacted again imm
 calling Logcat. It does not bypass `maximumLogLevel` or `captureBodies`; credentials, cookies,
 tokens, passwords, common PII and configured custom fields remain redacted.
 
-## Koin integration
+## Android Koin integration
 
 Netlogger owns a namespaced Koin module for its database, repositories, use cases, interceptor,
 manager and ViewModels. `Netlogger.init(...)` is synchronized and safely coexists with the host:

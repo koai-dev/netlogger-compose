@@ -1,0 +1,353 @@
+package com.netlogger.lib.presentation.ui.settings
+
+import androidx.compose.foundation.Image
+import androidx.compose.foundation.background
+import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.verticalScroll
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material3.*
+import androidx.compose.runtime.*
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
+import org.jetbrains.compose.resources.painterResource
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
+import androidx.compose.foundation.clickable
+import com.netlogger.lib.resources.Res
+import com.netlogger.lib.resources.*
+import com.netlogger.lib.domain.model.LogLevel
+import com.netlogger.lib.domain.model.LogSettings
+import com.netlogger.lib.presentation.ui.detail.NetloggerDetailColors
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+fun NetloggerSettingsScreen(
+    viewModel: NetloggerSettingsViewModel,
+    onBack: () -> Unit
+) {
+    val settings by viewModel.settings.collectAsState()
+
+    Scaffold(
+        topBar = {
+            TopAppBar(
+                title = { Text("Settings", fontWeight = FontWeight.Bold, fontSize = 18.sp) },
+                navigationIcon = {
+                    IconButton(onClick = onBack) {
+                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back")
+                    }
+                },
+                actions = {
+                    IconButton(onClick = { onBack() }) {
+                        Icon(painter = painterResource(Res.drawable.ic_save), contentDescription = "Save", tint = NetloggerDetailColors.Teal)
+                    }
+                },
+                colors = TopAppBarDefaults.topAppBarColors(containerColor = Color.White)
+            )
+        },
+        containerColor = Color(0xFFF8FAFC)
+    ) { paddingValues ->
+        NetloggerSettingsContent(
+            settings = settings,
+            paddingValues = paddingValues,
+            onAutoResetChange = { viewModel.updateAutoReset(it) },
+            onShakeDetectorChange = { viewModel.updateShakeDetector(it) },
+            onShakeSensitivityChange = { viewModel.updateShakeSensitivity(it) },
+            onLogLevelChange = { viewModel.updateLogLevel(it) },
+            onFloatingButtonChange = { viewModel.updateFloatingButton(it) }
+        )
+    }
+}
+
+@Composable
+private fun NetloggerSettingsContent(
+    settings: LogSettings,
+    paddingValues: PaddingValues,
+    onAutoResetChange: (Boolean) -> Unit,
+    onShakeDetectorChange: (Boolean) -> Unit,
+    onShakeSensitivityChange: (Float) -> Unit,
+    onLogLevelChange: (LogLevel) -> Unit,
+    onFloatingButtonChange: (Boolean) -> Unit
+) {
+    Column(
+        modifier = Modifier
+            .fillMaxSize()
+            .padding(paddingValues)
+            .verticalScroll(rememberScrollState())
+            .padding(16.dp),
+        verticalArrangement = Arrangement.spacedBy(24.dp)
+    ) {
+        // Log Management
+        SettingsSection(title = "Log Management") {
+            SettingToggleItem(
+                title = "Auto-reset logs",
+                subtitle = "Clear all logs when app starts",
+                checked = settings.autoResetOnStart,
+                onCheckedChange = onAutoResetChange
+            )
+            HorizontalDivider(modifier = Modifier.padding(vertical = 12.dp), thickness = 0.5.dp)
+            SettingLogLevelItem(
+                selectedLevel = settings.logLevel,
+                onLevelChange = onLogLevelChange
+            )
+        }
+
+        // Shake to Report
+        if (com.netlogger.lib.platform.supportsAndroidShortcuts) SettingsSection(title = "Shake to Report") {
+            SettingToggleItem(
+                title = "Enable Shake Detector",
+                subtitle = "Shake device to instantly capture network state",
+                checked = settings.enableShakeDetector,
+                onCheckedChange = onShakeDetectorChange
+            )
+            
+            if (settings.enableShakeDetector) {
+                HorizontalDivider(modifier = Modifier.padding(vertical = 8.dp), thickness = 0.5.dp)
+                Column(modifier = Modifier.padding(vertical = 8.dp)) {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Text("Sensitivity", fontSize = 14.sp, fontWeight = FontWeight.Medium)
+                        Surface(
+                            color = Color(0xFFE0F2F1),
+                            shape = RoundedCornerShape(4.dp)
+                        ) {
+                            val label = when {
+                                settings.shakeSensitivity < 1.5f -> "LOW"
+                                settings.shakeSensitivity < 3.0f -> "MEDIUM"
+                                else -> "HIGH"
+                            }
+                            Text(
+                                text = label,
+                                modifier = Modifier.padding(horizontal = 8.dp, vertical = 2.dp),
+                                fontSize = 12.sp,
+                                fontWeight = FontWeight.Bold,
+                                color = Color(0xFF00796B)
+                            )
+                        }
+                    }
+                    Slider(
+                        value = settings.shakeSensitivity,
+                        onValueChange = onShakeSensitivityChange,
+                        valueRange = 1f..5f,
+                        colors = SliderDefaults.colors(
+                            thumbColor = Color(0xFF00796B),
+                            activeTrackColor = Color(0xFF00796B)
+                        )
+                    )
+                    Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+                        Text("Low", fontSize = 12.sp, color = Color.Gray)
+                        Text("High", fontSize = 12.sp, color = Color.Gray)
+                    }
+                }
+            }
+            HorizontalDivider(modifier = Modifier.padding(vertical = 12.dp), thickness = 0.5.dp)
+            SettingToggleItem(
+                title = "Show Floating Button",
+                subtitle = "Display floating shortcut button to open logger",
+                checked = settings.enableFloatingButton,
+                onCheckedChange = onFloatingButtonChange
+            )
+        }
+
+        // About
+        SettingsSection(title = "About") {
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(vertical = 16.dp),
+                horizontalAlignment = Alignment.CenterHorizontally
+            ) {
+                Box(
+                    modifier = Modifier
+                        .size(64.dp)
+                        .clip(RoundedCornerShape(16.dp))
+                        .background(Color(0xFF00796B)),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Image(
+                        painter = painterResource(Res.drawable.ic_terminal),
+                        contentDescription = null,
+                        modifier = Modifier.size(32.dp)
+                    )
+                }
+                Spacer(modifier = Modifier.height(16.dp))
+                Text("NetScanner Pro", fontSize = 18.sp, fontWeight = FontWeight.Bold)
+                Text("Version 1.0.0", fontSize = 14.sp, color = Color.Gray)
+                Spacer(modifier = Modifier.height(12.dp))
+                Text(
+                    "Powered by Clean Architecture & Koin dependency injection.",
+                    fontSize = 13.sp,
+                    color = Color.Gray,
+                    textAlign = TextAlign.Center,
+                    modifier = Modifier.padding(horizontal = 24.dp)
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun SettingsSection(title: String, content: @Composable () -> Unit) {
+    Column {
+        Text(
+            text = title,
+            fontSize = 16.sp,
+            fontWeight = FontWeight.Bold,
+            color = Color(0xFF1E293B),
+            modifier = Modifier.padding(bottom = 8.dp)
+        )
+        Card(
+            modifier = Modifier.fillMaxWidth(),
+            colors = CardDefaults.cardColors(containerColor = Color.White),
+            shape = RoundedCornerShape(8.dp),
+            elevation = CardDefaults.cardElevation(defaultElevation = 1.dp)
+        ) {
+            Column(modifier = Modifier.padding(16.dp)) {
+                content()
+            }
+        }
+    }
+}
+
+@Composable
+private fun SettingToggleItem(
+    title: String,
+    subtitle: String,
+    checked: Boolean,
+    onCheckedChange: (Boolean) -> Unit
+) {
+    Row(
+        modifier = Modifier.fillMaxWidth(),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Column(modifier = Modifier.weight(1f)) {
+            Text(text = title, fontSize = 15.sp, fontWeight = FontWeight.Medium)
+            Text(text = subtitle, fontSize = 13.sp, color = Color.Gray)
+        }
+        Switch(
+            checked = checked,
+            onCheckedChange = onCheckedChange,
+            colors = SwitchDefaults.colors(
+                checkedThumbColor = Color.White,
+                checkedTrackColor = Color(0xFF2563EB)
+            )
+        )
+    }
+}
+
+@Composable
+private fun SettingLogLevelItem(
+    selectedLevel: LogLevel,
+    onLevelChange: (LogLevel) -> Unit
+) {
+    var expanded by remember { mutableStateOf(false) }
+
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clickable { expanded = true }
+            .padding(vertical = 4.dp),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Column(modifier = Modifier.weight(1f)) {
+            Text(text = "API Log Level", fontSize = 15.sp, fontWeight = FontWeight.Medium)
+            Text(
+                text = "Control how much API data is captured (${selectedLevel.name})",
+                fontSize = 13.sp,
+                color = Color.Gray
+            )
+        }
+        
+        Box {
+            Button(
+                onClick = { expanded = true },
+                colors = ButtonDefaults.buttonColors(
+                    containerColor = NetloggerDetailColors.Teal,
+                    contentColor = Color.White
+                ),
+                contentPadding = PaddingValues(horizontal = 12.dp, vertical = 6.dp),
+                shape = RoundedCornerShape(4.dp)
+            ) {
+                Text(selectedLevel.name, fontSize = 12.sp, fontWeight = FontWeight.Bold)
+            }
+
+            DropdownMenu(
+                expanded = expanded,
+                onDismissRequest = { expanded = false },
+                modifier = Modifier.background(Color.White)
+            ) {
+                LogLevel.values().forEach { level ->
+                    DropdownMenuItem(
+                        text = {
+                            Column {
+                                Text(
+                                    text = level.name,
+                                    fontWeight = if (level == selectedLevel) FontWeight.Bold else FontWeight.Normal,
+                                    color = if (level == selectedLevel) NetloggerDetailColors.Teal else Color.Unspecified
+                                )
+                                val details = when (level) {
+                                    LogLevel.ALL -> "Log info, headers and body"
+                                    LogLevel.HEADERS -> "Log info and headers only"
+                                    LogLevel.BODY -> "Log info and body only"
+                                    LogLevel.INFO -> "Log info only (no headers or body)"
+                                    LogLevel.NONE -> "Disable API logging completely"
+                                }
+                                Text(text = details, fontSize = 11.sp, color = Color.Gray)
+                            }
+                        },
+                        onClick = {
+                            onLevelChange(level)
+                            expanded = false
+                        }
+                    )
+                }
+            }
+        }
+    }
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@androidx.compose.ui.tooling.preview.Preview(showBackground = true)
+@Composable
+fun NetloggerSettingsPreview() {
+    MaterialTheme {
+        Scaffold(
+            topBar = {
+                TopAppBar(
+                    title = { Text("Settings", fontWeight = FontWeight.Bold) },
+                    navigationIcon = {
+                        IconButton(onClick = {}) {
+                            Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = null)
+                        }
+                    },
+                    colors = TopAppBarDefaults.topAppBarColors(containerColor = Color.White)
+                )
+            },
+            containerColor = Color(0xFFF8FAFC)
+        ) { paddingValues ->
+            NetloggerSettingsContent(
+                settings = LogSettings(
+                    autoResetOnStart = true,
+                    enableShakeDetector = true,
+                    shakeSensitivity = 2.7f,
+                    enableFloatingButton = true
+                ),
+                paddingValues = paddingValues,
+                onAutoResetChange = {},
+                onShakeDetectorChange = {},
+                onShakeSensitivityChange = {},
+                onLogLevelChange = {},
+                onFloatingButtonChange = {}
+            )
+        }
+    }
+}

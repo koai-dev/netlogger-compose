@@ -1,6 +1,8 @@
 package com.netlogger.sampleapp
 
 import android.os.Bundle
+import android.content.Intent
+import com.netlogger.lib.presentation.ui.NetloggerActivity
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
@@ -48,6 +50,9 @@ class MainActivity : ComponentActivity() {
                         horizontalAlignment = Alignment.CenterHorizontally,
                         verticalArrangement = Arrangement.spacedBy(32.dp)
                     ) {
+                        Button(onClick = { startActivity(Intent(this@MainActivity, NetloggerActivity::class.java)) }) {
+                            Text("Open Netlogger")
+                        }
                         Greeting(
                             name = "Demo Netlogger",
                             modifier = Modifier.padding(innerPadding)
@@ -67,24 +72,24 @@ class MainActivity : ComponentActivity() {
         }
 
         // Log a general message
-        LogUtil.log("MainActivity", "Activity created - fetching IP info...")
+        LogUtil.log("MainActivity", "Activity created - calling sample API...")
 
         // Trigger the sample API call
         fetchIpInfo()
     }
 
     /**
-     * Sample API call: GET http://ip-api.com/json/
+     * Sample API call: GET https://httpbin.org/get?token=example-secret&q=visible
      * This call is intercepted by Netlogger and visible in the Netlogger UI.
      *
      * Equivalent curl:
-     *   curl --location 'http://ip-api.com/json/'
+     *   curl --location 'https://httpbin.org/get?token=example-secret&q=visible'
      */
     private fun fetchIpInfo() {
         lifecycleScope.launch {
             try {
                 val request = Request.Builder()
-                    .url("http://ip-api.com/json/")
+                    .url("https://httpbin.org/get?token=example-secret&q=visible")
                     .get()
                     .build()
 
