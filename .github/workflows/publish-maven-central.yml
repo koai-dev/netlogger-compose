@@ -1,0 +1,66 @@
+name: Publish to Maven Central
+
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: Release version (must not already exist on Central)
+        required: true
+        default: '1.5.0'
+      group_id:
+        description: Verified Central Portal namespace
+        required: true
+        default: 'io.github.koai-dev'
+
+permissions:
+  contents: read
+
+concurrency:
+  group: maven-central-publish
+  cancel-in-progress: false
+
+jobs:
+  publish:
+    runs-on: macos-26
+    timeout-minutes: 60
+    environment: maven-central
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '21'
+      - uses: gradle/actions/setup-gradle@v4
+      - uses: android-actions/setup-android@v3
+      - name: Install Android SDK
+        run: sdkmanager 'platforms;android-36.1' 'build-tools;36.0.0'
+      - name: Configure Android SDK
+        run: echo "sdk.dir=$ANDROID_HOME" > local.properties
+      - name: Verify Android and iOS builds
+        run: ./scripts/verify-builds.sh
+      - name: Upload signed publications to Central Portal
+        env:
+          CENTRAL_GROUP_ID: ${{ inputs.group_id }}
+          RELEASE_VERSION: ${{ inputs.version }}
+          ORG_GRADLE_PROJECT_mavenCentralUsername: ${{ secrets.MAVEN_CENTRAL_USERNAME }}
+          ORG_GRADLE_PROJECT_mavenCentralPassword: ${{ secrets.MAVEN_CENTRAL_PASSWORD }}
+          ORG_GRADLE_PROJECT_signingInMemoryKey: ${{ secrets.SIGNING_IN_MEMORY_KEY }}
+          ORG_GRADLE_PROJECT_signingInMemoryKeyPassword: ${{ secrets.SIGNING_IN_MEMORY_KEY_PASSWORD }}
+        run: |
+          set -euo pipefail
+          for name in ORG_GRADLE_PROJECT_mavenCentralUsername ORG_GRADLE_PROJECT_mavenCentralPassword ORG_GRADLE_PROJECT_signingInMemoryKey; do
+            if [[ -z "${!name}" ]]; then
+              echo "Missing publishing secret: $name" >&2
+              exit 1
+            fi
+          done
+          ./gradlew --no-daemon :netlogger:publishToMavenCentral \
+            "-PGROUP=$CENTRAL_GROUP_ID" "-PVERSION_NAME=$RELEASE_VERSION"
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: publication-reports
+          path: |
+            app/build/reports/
+            netlogger/build/reports/
+            netlogger/build/publications/

@@ -18,3 +18,10 @@ local.properties
 **/build/
 iosApp/DerivedData/
 **/xcuserdata/
+
+# Local Maven Central tokens and private signing keys
+/.env
+/.env.*
+*.gpg
+*.key
+*private*.asc

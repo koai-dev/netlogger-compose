@@ -40,7 +40,7 @@ NETLOGGER_CLEAN_FRAMEWORK_OUTPUTS=1 ./scripts/verify-builds.sh
 
 Open `iosApp/NetloggerSample.xcodeproj` in Xcode and select the `NetloggerSample` scheme. Its build phase runs `embedAndSignAppleFrameworkForXcode`; Gradle chooses the device/simulator and Debug/Release framework from Xcode's environment. For running on a physical device, set your development team in Xcode. The verification script compiles device apps without signing and does not produce a distribution archive. The host `Info.plist` must set `CADisableMinimumFrameDurationOnPhone` to `true` for Compose iOS; the sample includes this required setting.
 
-This migration is version `1.5.0` in the source tree; it has not been published. Consume the local module with `implementation(project(":netlogger"))` in a KMP source set, or `debugImplementation(project(":netlogger"))` in an Android host. `./gradlew :netlogger:publishToMavenLocal` publishes KMP metadata and platform artifacts under `com.koai:netlogger:1.5.0`. Older JitPack releases are Android-only.
+This migration is version `1.5.0` in the source tree; it has not been published. Consume the local module with `implementation(project(":netlogger"))` in a KMP source set, or `debugImplementation(project(":netlogger"))` in an Android host. Maven Central publishing is configured for `io.github.koai-dev:netlogger:1.5.0`, including all Android/iOS publications and signing. See [Maven Central setup and release commands](docs/maven-central.md) for namespace verification, credentials, local staging and the manual GitHub Actions workflow. `publishToMavenLocal` also requires a signing key for release versions. Older JitPack releases are Android-only.
 
 ## Ktor and iOS usage
 

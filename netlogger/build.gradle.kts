@@ -7,11 +7,11 @@ plugins {
     alias(libs.plugins.kotlin.compose)
     alias(libs.plugins.kotlin.serialization)
     id("com.google.devtools.ksp")
-    id("maven-publish")
+    alias(libs.plugins.maven.publish)
 }
 
-group = "com.koai"
-version = "1.5.0"
+group = providers.gradleProperty("GROUP").get()
+version = providers.gradleProperty("VERSION_NAME").get()
 
 kotlin {
     compilerOptions.freeCompilerArgs.add("-Xexpect-actual-classes")
@@ -82,3 +82,37 @@ dependencies {
 }
 
 tasks.register("localBuild") { dependsOn("assemble", "linkDebugFrameworkIosSimulatorArm64") }
+
+mavenPublishing {
+    publishToMavenCentral(automaticRelease = false)
+    signAllPublications()
+    pom {
+        name.set("Netlogger Compose")
+        description.set("A Kotlin Multiplatform network logger with shared Compose UI for Android and iOS.")
+        url.set("https://github.com/koai-dev/netlogger-compose")
+        licenses {
+            license {
+                name.set("The Apache License, Version 2.0")
+                url.set("https://www.apache.org/licenses/LICENSE-2.0.txt")
+                distribution.set("repo")
+            }
+        }
+        developers {
+            developer {
+                id.set("koai-dev")
+                name.set("koai-dev")
+                url.set("https://github.com/koai-dev")
+            }
+        }
+        scm {
+            url.set("https://github.com/koai-dev/netlogger-compose")
+            connection.set("scm:git:https://github.com/koai-dev/netlogger-compose.git")
+            developerConnection.set("scm:git:ssh://git@github.com/koai-dev/netlogger-compose.git")
+        }
+    }
+}
+
+publishing.repositories.maven {
+    name = "localStaging"
+    url = uri(rootProject.layout.buildDirectory.dir("maven-staging"))
+}
