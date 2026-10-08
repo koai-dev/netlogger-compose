@@ -47,6 +47,32 @@ debugImplementation("io.github.koai-dev:netlogger:1.5.0")
 For local publishing, put secrets in `~/.gradle/gradle.properties` (outside this
 repository), or use the equivalent `ORG_GRADLE_PROJECT_...` environment variables:
 
+If the private signing key is already in your local GPG keyring, use GPG directly
+without exporting it. First list the available signing keys:
+
+```bash
+gpg --list-secret-keys --keyid-format LONG
+```
+
+Add these properties to `~/.gradle/gradle.properties`, using your signing key ID
+or full fingerprint:
+
+```properties
+mavenCentralUsername=<Central token username>
+mavenCentralPassword=<Central token password>
+signing.useGpgCmd=true
+signing.gnupg.keyName=<signing key ID or fingerprint>
+```
+
+GPG uses your local agent to unlock a passphrase-protected key. This mode requires
+`gpg` on `PATH`; optionally set `signing.gnupg.executable` to its absolute path.
+Central tokens and GPG signing are separate: configuring only the token causes
+the `no configured signatory` error. Properties in `local.properties` are not
+used for signing.
+
+For an exported private key file, omit `signing.useGpgCmd=true` and use this
+alternative configuration:
+
 ```properties
 mavenCentralUsername=<Central token username>
 mavenCentralPassword=<Central token password>
@@ -75,6 +101,7 @@ and tests do not need signing secrets.
 ./scripts/verify-builds.sh
 
 # Build and sign all publications into build/maven-staging; no Central token needed
+./gradlew --no-daemon :netlogger:verifyNetloggerSigningCredentials
 ./gradlew --no-daemon :netlogger:publishAllPublicationsToLocalStagingRepository
 
 # Upload to Central Portal, then inspect the deployment and click Publish

@@ -1,4 +1,7 @@
 import org.jetbrains.kotlin.gradle.dsl.JvmTarget
+import org.gradle.plugins.signing.Sign
+import org.gradle.plugins.signing.SigningExtension
+import org.jetbrains.kotlin.gradle.plugin.mpp.apple.XCFramework
 
 plugins {
     alias(libs.plugins.kotlin.multiplatform)
@@ -24,10 +27,17 @@ kotlin {
         withHostTest {}
         withDeviceTest { instrumentationRunner = "androidx.test.runner.AndroidJUnitRunner" }
     }
+    val xcf = XCFramework("Netlogger")
     listOf(iosArm64(), iosSimulatorArm64()).forEach { target ->
         target.binaries.framework {
             baseName = "Netlogger"
             isStatic = true
+            binaryOption(
+                "bundleId",
+                "io.github.koai-dev.netlogger"
+            )
+
+            xcf.add(this)
         }
     }
     sourceSets {
@@ -111,6 +121,27 @@ mavenPublishing {
         }
     }
 }
+
+val signingConfiguration = extensions.getByType<SigningExtension>()
+if (providers.gradleProperty("signing.useGpgCmd").map { it.toBoolean() }.orElse(false).get()) {
+    signingConfiguration.useGpgCmd()
+}
+
+val verifyNetloggerSigningCredentials = tasks.register("verifyNetloggerSigningCredentials") {
+    group = "publishing"
+    description = "Checks that a release signing identity is configured without uploading artifacts."
+    doLast {
+        if (!project.version.toString().endsWith("-SNAPSHOT") && signingConfiguration.signatory == null) {
+            throw GradleException(
+                "No GPG signing identity is configured. Central tokens do not configure signing. " +
+                    "For a local GPG key, set signing.useGpgCmd=true and signing.gnupg.keyName " +
+                    "in ~/.gradle/gradle.properties; alternatively configure signingInMemoryKey " +
+                    "or signing.keyId/password/secretKeyRingFile. See docs/maven-central.md."
+            )
+        }
+    }
+}
+tasks.withType<Sign>().configureEach { dependsOn(verifyNetloggerSigningCredentials) }
 
 publishing.repositories.maven {
     name = "localStaging"
