@@ -6,7 +6,7 @@ on:
       version:
         description: Release version (must not already exist on Central)
         required: true
-        default: '1.5.0'
+        default: '1.5.1'
       group_id:
         description: Verified Central Portal namespace
         required: true

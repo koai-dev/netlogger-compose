@@ -20,7 +20,7 @@ kotlin {
     compilerOptions.freeCompilerArgs.add("-Xexpect-actual-classes")
     android {
         namespace = "com.netlogger.lib"
-        compileSdk = 36
+        compileSdk = 37
         minSdk = 24
         androidResources.enable = true
         compilerOptions.jvmTarget.set(JvmTarget.JVM_21)
