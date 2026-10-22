@@ -37,6 +37,9 @@
          </BuildableReference>
       </MacroExpansion>
       <Testables>
+         <TestableReference skipped="NO">
+            <BuildableReference BuildableIdentifier="primary" BlueprintIdentifier="A11000000000000000000005" BuildableName="NetloggerSampleTests.xctest" BlueprintName="NetloggerSampleTests" ReferencedContainer="container:NetloggerSample.xcodeproj"/>
+         </TestableReference>
       </Testables>
    </TestAction>
    <LaunchAction

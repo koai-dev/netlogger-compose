@@ -9,14 +9,17 @@ import kotlinx.coroutines.flow.Flow
 import kotlinx.serialization.json.Json
 import platform.Foundation.NSUserDefaults
 
-internal class SettingsRepositoryImpl(private val config: NetloggerConfig) : SettingsRepository {
-    private val prefs = NSUserDefaults(suiteName = "com.netlogger.lib.settings")
+internal class SettingsRepositoryImpl(
+    private val config: NetloggerConfig,
+    private val prefs: NSUserDefaults = NSUserDefaults(suiteName = "com.netlogger.lib.settings")
+) : SettingsRepository {
     private val current = MutableStateFlow(readSettings())
     override fun getSettings(): Flow<LogSettings> = current
     override fun getCurrentSettings(): LogSettings = current.value
     override suspend fun saveSettings(settings: LogSettings) {
         prefs.setBool(settings.autoResetOnStart, "auto_reset")
         prefs.setObject(settings.logLevel.name, "log_level")
+        prefs.setBool(settings.enableShakeDetector && config.allowShakeDetector, "enable_shake")
         current.value = readSettings()
     }
     private fun readSettings(): LogSettings {
@@ -32,7 +35,9 @@ internal class SettingsRepositoryImpl(private val config: NetloggerConfig) : Set
             else -> LogLevel.INFO
         }
         return LogSettings(autoResetOnStart = prefs.boolForKey("auto_reset"), logLevel = level,
-            enableShakeDetector = false, enableFloatingButton = false)
+            enableShakeDetector = config.allowShakeDetector &&
+                (prefs.objectForKey("enable_shake") == null || prefs.boolForKey("enable_shake")),
+            enableFloatingButton = false)
     }
     override fun getFilterTabOrder(): List<String> = runCatching {
         Json.decodeFromString<List<String>>(prefs.stringForKey("filter_tab_order") ?: "[]")

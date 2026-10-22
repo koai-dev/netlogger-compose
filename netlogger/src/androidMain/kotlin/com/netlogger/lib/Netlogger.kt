@@ -164,7 +164,9 @@ actual object Netlogger {
 
     private fun setupShakeDetector(application: Application) {
         sensorManager = application.getSystemService(Context.SENSOR_SERVICE) as SensorManager
-        shakeDetector = ShakeDetector(sensitivity = sensitivity) {
+        shakeDetector = ShakeDetector(sensitivity = sensitivity) shake@{
+            // A sensor event can already be queued when Settings unregisters the listener.
+            if (!isShakeEnabled) return@shake
             currentActivityRef?.get()?.let { activity ->
                 if (activity !is NetloggerActivity) {
                     val intent = Intent(activity, NetloggerActivity::class.java)

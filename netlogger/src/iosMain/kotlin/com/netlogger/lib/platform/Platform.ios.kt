@@ -31,7 +31,9 @@ internal actual fun copyToClipboard(context: ClipboardContext, label: String, te
     )
 }
 internal actual fun writeConsole(priority: Int, tag: String, message: String) {
-    NSLog("%@", "$tag: $message")
+    // Kotlin Strings in NSLog's variadic arguments are unsafe for the %@ object formatter.
+    // Write literal text to stdout, which is also visible in the Xcode console.
+    kotlin.io.println("$tag: $message")
 }
 
 internal actual val supportsAndroidShortcuts: Boolean = false

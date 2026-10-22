@@ -6,9 +6,17 @@
 	objectVersion = 46;
 	objects = {
 
+/* Begin PBXContainerItemProxy section */
+        A1100000000000000000000B = {isa = PBXContainerItemProxy; containerPortal = 8974DAF0BE5E04BC3D8FD37E; proxyType = 1; remoteGlobalIDString = C58BDECFA342DF9F0D33C731; remoteInfo = NetloggerSample; };
+/* End PBXContainerItemProxy section */
+/* Begin PBXTargetDependency section */
+        A11000000000000000000008 = {isa = PBXTargetDependency; target = C58BDECFA342DF9F0D33C731; targetProxy = A1100000000000000000000B; };
+/* End PBXTargetDependency section */
+
 /* Begin PBXBuildFile section */
 		AF456718DA6AB400F16B160F /* Foundation.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 64EA226904B2E4127BF62242 /* Foundation.framework */; };
 		FD8CD58D61B86C09EF43ECFB /* AppDelegate.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4D2D73B72DB86BAFD41B1116 /* AppDelegate.swift */; };
+		A11000000000000000000001 = {isa = PBXBuildFile; fileRef = A11000000000000000000002; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
@@ -16,6 +24,8 @@
 		64EA226904B2E4127BF62242 /* Foundation.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = Foundation.framework; path = Platforms/iPhoneOS.platform/Developer/SDKs/iPhoneOS26.0.sdk/System/Library/Frameworks/Foundation.framework; sourceTree = DEVELOPER_DIR; };
 		A0C1AD8BC9FF51E35BA51DE4 /* Info.plist */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.plist.xml; path = Info.plist; sourceTree = "<group>"; };
 		EC33FF583C1742B09709AA7B /* NetloggerSample.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = NetloggerSample.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		A11000000000000000000002 = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ShakePresentationTests.swift; sourceTree = "<group>"; };
+		A11000000000000000000003 = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; path = NetloggerSampleTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -60,6 +70,7 @@
 			isa = PBXGroup;
 			children = (
 				EC33FF583C1742B09709AA7B /* NetloggerSample.app */,
+				A11000000000000000000003,
 			);
 			name = Products;
 			sourceTree = "<group>";
@@ -70,9 +81,11 @@
 				DEDEB14B52CDC46FF749A099 /* Products */,
 				5A396C9FFA097B998F86B325 /* Frameworks */,
 				93C8537DA8710C95BF135710 /* iosApp */,
+				A11000000000000000000004,
 			);
 			sourceTree = "<group>";
 		};
+		A11000000000000000000004 = {isa = PBXGroup; children = (A11000000000000000000002,); path = NetloggerSampleTests; sourceTree = "<group>"; };
 /* End PBXGroup section */
 
 /* Begin PBXNativeTarget section */
@@ -94,6 +107,7 @@
 			productReference = EC33FF583C1742B09709AA7B /* NetloggerSample.app */;
 			productType = "com.apple.product-type.application";
 		};
+		A11000000000000000000005 = {isa = PBXNativeTarget; buildConfigurationList = A11000000000000000000006; buildPhases = (A11000000000000000000007,); buildRules = (); dependencies = (A11000000000000000000008,); name = NetloggerSampleTests; productName = NetloggerSampleTests; productReference = A11000000000000000000003; productType = "com.apple.product-type.bundle.unit-test"; };
 /* End PBXNativeTarget section */
 
 /* Begin PBXProject section */
@@ -119,6 +133,7 @@
 			projectRoot = "";
 			targets = (
 				C58BDECFA342DF9F0D33C731 /* NetloggerSample */,
+				A11000000000000000000005,
 			);
 		};
 /* End PBXProject section */
@@ -164,6 +179,7 @@
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
+		A11000000000000000000007 = {isa = PBXSourcesBuildPhase; buildActionMask = 2147483647; files = (A11000000000000000000001,); runOnlyForDeploymentPostprocessing = 0; };
 /* End PBXSourcesBuildPhase section */
 
 /* Begin XCBuildConfiguration section */
@@ -355,6 +371,28 @@
 			};
 			name = Release;
 		};
+		A11000000000000000000009 = {isa = XCBuildConfiguration; buildSettings = {
+                BUNDLE_LOADER = "$(TEST_HOST)";
+                GENERATE_INFOPLIST_FILE = YES;
+                IPHONEOS_DEPLOYMENT_TARGET = 16.0;
+                PRODUCT_BUNDLE_IDENTIFIER = com.netlogger.sampleapp.ios.tests;
+                PRODUCT_NAME = "$(TARGET_NAME)";
+                SDKROOT = iphoneos;
+                SWIFT_VERSION = 5.0;
+                TARGETED_DEVICE_FAMILY = "1,2";
+                TEST_HOST = "$(BUILT_PRODUCTS_DIR)/NetloggerSample.app/NetloggerSample";
+            }; name = Debug; };
+		A1100000000000000000000A = {isa = XCBuildConfiguration; buildSettings = {
+                BUNDLE_LOADER = "$(TEST_HOST)";
+                GENERATE_INFOPLIST_FILE = YES;
+                IPHONEOS_DEPLOYMENT_TARGET = 16.0;
+                PRODUCT_BUNDLE_IDENTIFIER = com.netlogger.sampleapp.ios.tests;
+                PRODUCT_NAME = "$(TARGET_NAME)";
+                SDKROOT = iphoneos;
+                SWIFT_VERSION = 5.0;
+                TARGETED_DEVICE_FAMILY = "1,2";
+                TEST_HOST = "$(BUILT_PRODUCTS_DIR)/NetloggerSample.app/NetloggerSample";
+            }; name = Release; };
 /* End XCBuildConfiguration section */
 
 /* Begin XCConfigurationList section */
@@ -376,6 +414,7 @@
 			defaultConfigurationIsVisible = 0;
 			defaultConfigurationName = Release;
 		};
+		A11000000000000000000006 = {isa = XCConfigurationList; buildConfigurations = (A11000000000000000000009,A1100000000000000000000A,); defaultConfigurationIsVisible = 0; defaultConfigurationName = Release; };
 /* End XCConfigurationList section */
 	};
 	rootObject = 8974DAF0BE5E04BC3D8FD37E /* Project object */;

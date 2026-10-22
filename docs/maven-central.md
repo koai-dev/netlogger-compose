@@ -12,7 +12,7 @@ Public coordinates are defined in the root `gradle.properties`:
 ```properties
 GROUP=io.github.koai-dev
 POM_ARTIFACT_ID=netlogger
-VERSION_NAME=1.5.0
+VERSION_NAME=1.5.2
 ```
 
 The four publications are `netlogger`, `netlogger-android`, `netlogger-iosarm64`
@@ -29,10 +29,10 @@ After release, consumers add `mavenCentral()` and:
 
 ```kotlin
 // KMP commonMain
-implementation("io.github.koai-dev:netlogger:1.5.0")
+implementation("io.github.koai-dev:netlogger:1.5.2")
 
 // Android-only debug host
-debugImplementation("io.github.koai-dev:netlogger:1.5.0")
+debugImplementation("io.github.koai-dev:netlogger:1.5.2")
 ```
 
 ## Central account and signing key
@@ -112,7 +112,7 @@ and tests do not need signing secrets.
 ```
 
 For a different namespace or version, append `-PGROUP=io.github.koai-dev`
-and/or `-PVERSION_NAME=1.5.1`. Publish the complete module; publishing only an
+and/or `-PVERSION_NAME=1.5.2`. Publish the complete module; publishing only an
 Android or iOS publication leaves the common metadata pointing to missing
 artifacts.
 

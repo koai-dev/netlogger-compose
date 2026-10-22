@@ -12,6 +12,7 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import org.jetbrains.compose.resources.painterResource
@@ -98,16 +99,17 @@ private fun NetloggerSettingsContent(
             )
         }
 
-        // Shake to Report
-        if (com.netlogger.lib.platform.supportsAndroidShortcuts) SettingsSection(title = "Shake to Report") {
+        // Platform shortcuts
+        SettingsSection(title = "Shortcuts") {
             SettingToggleItem(
                 title = "Enable Shake Detector",
-                subtitle = "Shake device to instantly capture network state",
+                subtitle = "Shake device to open the log viewer",
                 checked = settings.enableShakeDetector,
-                onCheckedChange = onShakeDetectorChange
+                onCheckedChange = onShakeDetectorChange,
+                testTag = "netlogger.shake.toggle"
             )
             
-            if (settings.enableShakeDetector) {
+            if (settings.enableShakeDetector && com.netlogger.lib.platform.supportsAndroidShortcuts) {
                 HorizontalDivider(modifier = Modifier.padding(vertical = 8.dp), thickness = 0.5.dp)
                 Column(modifier = Modifier.padding(vertical = 8.dp)) {
                     Row(
@@ -135,6 +137,7 @@ private fun NetloggerSettingsContent(
                         }
                     }
                     Slider(
+                        modifier = Modifier.testTag("netlogger.shake.sensitivity"),
                         value = settings.shakeSensitivity,
                         onValueChange = onShakeSensitivityChange,
                         valueRange = 1f..5f,
@@ -149,13 +152,16 @@ private fun NetloggerSettingsContent(
                     }
                 }
             }
-            HorizontalDivider(modifier = Modifier.padding(vertical = 12.dp), thickness = 0.5.dp)
-            SettingToggleItem(
-                title = "Show Floating Button",
-                subtitle = "Display floating shortcut button to open logger",
-                checked = settings.enableFloatingButton,
-                onCheckedChange = onFloatingButtonChange
-            )
+            if (com.netlogger.lib.platform.supportsAndroidShortcuts) {
+                HorizontalDivider(modifier = Modifier.padding(vertical = 12.dp), thickness = 0.5.dp)
+                SettingToggleItem(
+                    title = "Show Floating Button",
+                    subtitle = "Display floating shortcut button to open logger",
+                    checked = settings.enableFloatingButton,
+                    onCheckedChange = onFloatingButtonChange,
+                    testTag = "netlogger.floating.toggle"
+                )
+            }
         }
 
         // About
@@ -223,7 +229,8 @@ private fun SettingToggleItem(
     title: String,
     subtitle: String,
     checked: Boolean,
-    onCheckedChange: (Boolean) -> Unit
+    onCheckedChange: (Boolean) -> Unit,
+    testTag: String = ""
 ) {
     Row(
         modifier = Modifier.fillMaxWidth(),
@@ -234,6 +241,7 @@ private fun SettingToggleItem(
             Text(text = subtitle, fontSize = 13.sp, color = Color.Gray)
         }
         Switch(
+            modifier = Modifier.testTag(testTag),
             checked = checked,
             onCheckedChange = onCheckedChange,
             colors = SwitchDefaults.colors(

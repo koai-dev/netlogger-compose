@@ -1,0 +1,6 @@
+<component name="ArtifactManager">
+  <artifact type="jar" name="netlogger-1.5.1">
+    <output-path>$PROJECT_DIR$/netlogger/build/libs</output-path>
+    <root id="archive" name="netlogger-1.5.1.jar" />
+  </artifact>
+</component>

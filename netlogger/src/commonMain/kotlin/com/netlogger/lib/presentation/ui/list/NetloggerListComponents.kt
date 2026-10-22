@@ -37,6 +37,8 @@ import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
@@ -124,11 +126,13 @@ internal fun NetloggerHeader(
                         onClick = onClearLogs
                     )
                     NetloggerIconButton(
+                        modifier = Modifier.semantics { contentDescription = "Settings" },
                         icon = Res.drawable.ic_settings,
                         colorFilter = NetloggerListColors.Gear,
                         onClick = onSettingsClick
                     )
                     NetloggerIconButton(
+                        modifier = Modifier.semantics { contentDescription = "Close" },
                         icon = Res.drawable.ic_close,
                         colorFilter = NetloggerListColors.Gear,
                         onClick = onClose

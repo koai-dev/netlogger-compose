@@ -11,6 +11,7 @@ import com.netlogger.lib.domain.model.LogSeverity
 import com.netlogger.lib.domain.usecase.*
 import com.netlogger.lib.network.netlogger
 import com.netlogger.lib.presentation.ui.list.NetloggerListViewModel
+import com.netlogger.lib.presentation.ui.IosShakePresenter
 import com.netlogger.lib.presentation.ui.settings.NetloggerSettingsViewModel
 import com.netlogger.lib.presentation.util.NetloggerConsoleLogger
 import com.netlogger.lib.presentation.util.NetloggerRedactor
@@ -19,6 +20,7 @@ import kotlinx.coroutines.*
 import kotlinx.coroutines.channels.BufferOverflow
 import kotlinx.coroutines.channels.Channel
 import platform.Foundation.*
+import platform.UIKit.UIWindow
 
 /** iOS entry point. Initialize once on the main thread before constructing a client or UI. */
 actual object Netlogger {
@@ -29,6 +31,7 @@ actual object Netlogger {
     private lateinit var settings: SettingsRepositoryImpl
     private lateinit var redactor: NetloggerRedactor
     private lateinit var console: NetloggerConsoleLogger
+    private val shakePresenter = IosShakePresenter()
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
     private val queue = Channel<LogEntryToSave>(64, BufferOverflow.DROP_OLDEST)
 
@@ -58,6 +61,21 @@ actual object Netlogger {
     }
 
     actual fun isInitialized(): Boolean = initialized
+
+    /** Forward a UIKit motionShake event here when the host uses its own UIWindow subclass. */
+    fun handleShake(window: UIWindow): Boolean {
+        check(NSThread.isMainThread) { "Handle shake gestures on the main thread" }
+        if (!initialized || !configuration.allowShakeDetector || !settings.getCurrentSettings().enableShakeDetector) return false
+        return shakePresenter.present(window)
+    }
+
+    /** Opens the viewer manually, including when shake-to-open is disabled in Settings. */
+    fun showLogs(window: UIWindow): Boolean {
+        check(NSThread.isMainThread) { "Present Netlogger on the main thread" }
+        check(initialized) { "Call Netlogger.init first" }
+        return shakePresenter.present(window, debounce = false)
+    }
+
     actual fun configureClient(client: HttpClientConfig<*>) {
         check(initialized) { "Call Netlogger.init first" }
         client.netlogger(configuration, settings, repository)

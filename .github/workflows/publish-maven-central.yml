@@ -6,7 +6,7 @@ on:
       version:
         description: Release version (must not already exist on Central)
         required: true
-        default: '1.5.1'
+        default: '1.5.2'
       group_id:
         description: Verified Central Portal namespace
         required: true
@@ -33,11 +33,13 @@ jobs:
       - uses: gradle/actions/setup-gradle@v4
       - uses: android-actions/setup-android@v3
       - name: Install Android SDK
-        run: sdkmanager 'platforms;android-36.1' 'build-tools;36.0.0'
+        run: sdkmanager 'platforms;android-37' 'platforms;android-36.1' 'build-tools;36.0.0'
       - name: Configure Android SDK
         run: echo "sdk.dir=$ANDROID_HOME" > local.properties
       - name: Verify Android and iOS builds
         run: ./scripts/verify-builds.sh
+      - name: Verify iOS UI and UIKit shake presentation
+        run: ./scripts/verify-ui-tests.sh ios
       - name: Upload signed publications to Central Portal
         env:
           CENTRAL_GROUP_ID: ${{ inputs.group_id }}
@@ -64,3 +66,4 @@ jobs:
             app/build/reports/
             netlogger/build/reports/
             netlogger/build/publications/
+            iosApp/DerivedData/Logs/Test/

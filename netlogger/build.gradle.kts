@@ -29,6 +29,9 @@ kotlin {
     }
     val xcf = XCFramework("Netlogger")
     listOf(iosArm64(), iosSimulatorArm64()).forEach { target ->
+        // KLIB source paths also feed generated native bridge symbol names.
+        // Keep the publisher's absolute checkout path out of our native artifacts.
+        target.compilerOptions.freeCompilerArgs.add("-Xklib-relative-path-base=${rootDir.absolutePath}")
         target.binaries.framework {
             baseName = "Netlogger"
             isStatic = true
@@ -40,6 +43,7 @@ kotlin {
             xcf.add(this)
         }
     }
+    applyDefaultHierarchyTemplate()
     sourceSets {
         commonMain.dependencies {
             implementation(libs.compose.multiplatform.runtime)
@@ -60,6 +64,12 @@ kotlin {
             implementation(kotlin("test"))
             implementation(libs.ktor.client.mock)
         }
+        val sharedUiTest by creating {
+            dependsOn(commonTest.get())
+            dependencies { implementation(libs.compose.multiplatform.ui.test) }
+        }
+        getByName("iosTest").dependsOn(sharedUiTest)
+        getByName("androidDeviceTest").dependsOn(sharedUiTest)
         androidMain.dependencies {
             implementation(libs.androidx.core.ktx)
             implementation(libs.androidx.activity.compose)

@@ -8,13 +8,20 @@ import com.netlogger.lib.presentation.ui.detail.NetloggerDetailScreen
 import com.netlogger.lib.presentation.ui.list.NetloggerListScreen
 import com.netlogger.lib.presentation.ui.settings.NetloggerSettingsScreen
 import platform.UIKit.UIViewController
+import platform.UIKit.UINavigationController
 
 /** Presents the shared log list, JSON viewer, filtering, cURL export, and settings. */
 fun NetloggerViewController(onClose: () -> Unit = {}): UIViewController {
     check(Netlogger.isInitialized()) { "Call Netlogger.init first" }
-    return ComposeUIViewController {
+    val content = ComposeUIViewController {
         MaterialTheme { NetloggerContent(onClose) }
     }
+    return NetloggerNavigationController(content)
+}
+
+/** Marker shared by manual and shake presentation to prevent stacking log viewers. */
+internal class NetloggerNavigationController(content: UIViewController) : UINavigationController(rootViewController = content) {
+    init { setNavigationBarHidden(true, animated = false) }
 }
 
 @Composable
