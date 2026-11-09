@@ -240,7 +240,8 @@ actual object Netlogger {
         val root = activity.window.decorView as FrameLayout
         fab = FloatingActionButton(contextWrapper).apply {
             setImageResource(android.R.drawable.ic_menu_info_details)
-            size = FloatingActionButton.SIZE_NORMAL
+            customSize = 24
+            useCompatPadding = false
             backgroundTintList = ColorStateList.valueOf(
                 ContextCompat.getColor(activity, R.color.netlogger_bg)
             )
