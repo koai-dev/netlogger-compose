@@ -21,7 +21,7 @@ A network logging library for Android and iOS, built with Kotlin Multiplatform, 
 - `iosApp/NetloggerSample.xcodeproj`: iOS sample application hosting shared Compose UI.
 - `commonTest`, `androidHostTest`, `iosTest`: shared capture/redaction tests, Android compatibility tests, native console regression tests, and native Room storage tests.
 
-Requirements: JDK 21, Android SDK 37 and 36.1, macOS with full Xcode and an iOS Simulator runtime. The iOS minimum deployment target is 16.0; Android minSdk is 24. Native targets are `iosArm64` (devices) and `iosSimulatorArm64` (Apple Silicon simulators).
+Requirements: JDK 21, Android SDK 37, macOS with full Xcode and an iOS Simulator runtime. Android consumers must use `compileSdk` 37 or newer. The iOS minimum deployment target is 16.0; Android minSdk is 24. Native targets are `iosArm64` (devices) and `iosSimulatorArm64` (Apple Silicon simulators).
 
 ```bash
 # Android APKs and host tests
@@ -40,7 +40,7 @@ NETLOGGER_CLEAN_FRAMEWORK_OUTPUTS=1 ./scripts/verify-builds.sh
 
 Open `iosApp/NetloggerSample.xcodeproj` in Xcode and select the `NetloggerSample` scheme. Its build phase runs `embedAndSignAppleFrameworkForXcode`; Gradle chooses the device/simulator and Debug/Release framework from Xcode's environment. For running on a physical device, set your development team in Xcode. The verification script compiles device apps without signing and does not produce a distribution archive. The host `Info.plist` must set `CADisableMinimumFrameDurationOnPhone` to `true` for Compose iOS; the sample includes this required setting.
 
-The source tree is prepared for `1.5.2`, including the [iOS console crash fix](docs/ios-console-crash.md) for `1.5.1`; this does not mean `1.5.2` has been published. Consume the local module with `implementation(project(":netlogger"))` in a KMP source set, or `debugImplementation(project(":netlogger"))` in an Android host. Maven Central publishing is configured for `io.github.koai-dev:netlogger:1.5.2`, including all Android/iOS publications and signing. See [Maven Central setup and release commands](docs/maven-central.md) for namespace verification, credentials, local staging and the manual GitHub Actions workflow. `publishToMavenLocal` also requires a signing key for release versions. Older JitPack releases are Android-only.
+The current version is `1.5.4`, including the [iOS console crash fix](docs/ios-console-crash.md) introduced in `1.5.2`. Add `mavenCentral()` and use `implementation("io.github.koai-dev:netlogger:1.5.4")` in a KMP source set, or `debugImplementation("io.github.koai-dev:netlogger:1.5.4")` in an Android host. To consume the local module, replace the Maven coordinates with `project(":netlogger")`. Maven Central publishing includes all Android/iOS publications and signing. See [Maven Central setup and release commands](docs/maven-central.md) for namespace verification, credentials, local staging and the manual GitHub Actions workflow. `publishToMavenLocal` also requires a signing key for release versions. Older JitPack releases are Android-only.
 
 ## Ktor and iOS usage
 

@@ -4,6 +4,7 @@
    <BuildAction>
       <BuildActionEntries>
          <BuildActionEntry
+            buildForTesting = "YES"
             buildForRunning = "YES">
             <BuildableReference
                BuildableIdentifier = "primary"
@@ -15,6 +16,23 @@
          </BuildActionEntry>
       </BuildActionEntries>
    </BuildAction>
+   <TestAction
+      buildConfiguration = "Debug"
+      selectedDebuggerIdentifier = "Xcode.DebuggerFoundation.Debugger.LLDB"
+      selectedLauncherIdentifier = "Xcode.IDEFoundation.Launcher.LLDB"
+      shouldUseLaunchSchemeArgsEnv = "YES">
+      <Testables>
+         <TestableReference skipped = "NO">
+            <BuildableReference
+               BuildableIdentifier = "primary"
+               BlueprintIdentifier = "A11000000000000000000005"
+               BuildableName = "NetloggerSampleTests.xctest"
+               BlueprintName = "NetloggerSampleTests"
+               ReferencedContainer = "container:NetloggerSample.xcodeproj">
+            </BuildableReference>
+         </TestableReference>
+      </Testables>
+   </TestAction>
    <LaunchAction
       useCustomWorkingDirectory = "NO"
       buildConfiguration = "Debug"

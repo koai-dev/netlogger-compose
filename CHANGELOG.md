@@ -1,6 +1,14 @@
 # Changelog
 
-## 1.5.2 — Unreleased
+## 1.5.4 — 2026-11-17
+
+- Update Kotlin to 2.4.21, Compose Multiplatform to 1.12.2, Android Gradle
+  Plugin to 9.5.1 and Gradle to 9.6.0.
+- Update AndroidX, Room, Coroutines, Serialization, Ktor and OkHttp dependencies.
+- Align the Android sample with the dependencies' minimum `compileSdk` of 37.
+- Enable the existing UIKit host-app tests in the shared Xcode scheme.
+
+## 1.5.2
 
 - Fix an iOS `SIGSEGV` when `enableLogcatOutput = true` by writing literal text
   with `println` instead of passing a Kotlin string to variadic `NSLog`.
