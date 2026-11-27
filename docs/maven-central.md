@@ -1,4 +1,4 @@
-# Publishing Netlogger to Maven Central
+# Publishing Netlogger to Maven Central and JitPack
 
 The library uses `com.vanniktech.maven.publish` and the Central Portal API.
 Publishing runs on macOS so that Android and both iOS targets are included in one
@@ -12,7 +12,7 @@ Public coordinates are defined in the root `gradle.properties`:
 ```properties
 GROUP=io.github.koai-dev
 POM_ARTIFACT_ID=netlogger
-VERSION_NAME=1.5.4
+VERSION_NAME=1.5.5
 ```
 
 The four publications are `netlogger`, `netlogger-android`, `netlogger-iosarm64`
@@ -29,10 +29,10 @@ After release, consumers add `mavenCentral()` and:
 
 ```kotlin
 // KMP commonMain
-implementation("io.github.koai-dev:netlogger:1.5.4")
+implementation("io.github.koai-dev:netlogger:1.5.5")
 
 // Android-only debug host
-debugImplementation("io.github.koai-dev:netlogger:1.5.4")
+debugImplementation("io.github.koai-dev:netlogger:1.5.5")
 ```
 
 ## Central account and signing key
@@ -112,7 +112,7 @@ and tests do not need signing secrets.
 ```
 
 For a different namespace or version, append `-PGROUP=io.github.koai-dev`
-and/or `-PVERSION_NAME=1.5.4`. Publish the complete module; publishing only an
+and/or `-PVERSION_NAME=1.5.5`. Publish the complete module; publishing only an
 Android or iOS publication leaves the common metadata pointing to missing
 artifacts.
 
@@ -132,11 +132,62 @@ Configure these secrets in the repository or the `maven-central` environment:
 | `SIGNING_IN_MEMORY_KEY` | Complete ASCII-armored private GPG key |
 | `SIGNING_IN_MEMORY_KEY_PASSWORD` | Key passphrase; can be empty for an unencrypted key |
 
-Run **Publish to Maven Central** manually from Actions, selecting the intended
-source branch/commit, release version and verified group ID. The workflow first
-checks both platforms, then uploads all signed publications in a single
-deployment. It does not run on pushes or tags. Finish the release in the Central
-Portal after validation succeeds.
+**Publish to Maven Central** runs when a release tag (`1.5.5`, or `1.6.0-rc1`) is
+pushed, and can also be run manually from Actions with a chosen commit, version and
+group ID. A tag run fails unless the tag equals `VERSION_NAME` in
+`gradle.properties`, then uploads that version under `io.github.koai-dev`. The
+workflow first checks both platforms, then uploads all signed publications in a
+single deployment. Finish the release in the Central Portal after validation
+succeeds.
+
+## Release: one tag for Maven Central and JitPack
+
+1. Set `VERSION_NAME` in `gradle.properties` (and the documented versions) to the
+   new version, update `CHANGELOG.md`, and push the commit.
+2. Tag that commit with exactly the version and push the tag:
+
+   ```bash
+   git tag 1.5.5
+   git push origin 1.5.5
+   ```
+
+3. The tag starts the Maven Central workflow; publish its deployment in the Central
+   Portal.
+4. JitPack builds the tag on first request, or ahead of time from
+   [jitpack.io](https://jitpack.io/#koai-dev/netlogger-compose) (**Look up**, then
+   **Get it**). Its log is at
+   `https://jitpack.io/com/github/koai-dev/netlogger-compose/<tag>/build.log`.
+
+## JitPack
+
+JitPack builds on Linux with the command in `jitpack.yml`. It passes
+`GROUP=com.github.koai-dev.netlogger-compose` and `VERSION_NAME=<tag>`, because
+JitPack serves a multi-artifact build under `com.github.<user>.<repository>`; the
+Gradle module metadata then names the same coordinates that JitPack serves. With
+`JITPACK=true` set by JitPack, the build skips GPG signing. Kotlin cross-compiles the
+iOS KLIBs on Linux, so the four publications match Maven Central:
+
+```kotlin
+repositories { maven("https://jitpack.io") }
+
+// KMP commonMain
+implementation("com.github.koai-dev.netlogger-compose:netlogger:1.5.5")
+
+// Android-only debug host
+debugImplementation("com.github.koai-dev.netlogger-compose:netlogger-android:1.5.5")
+```
+
+Check the JitPack build locally without signing keys and without touching
+`~/.m2`:
+
+```bash
+JITPACK=true GROUP=com.github.koai-dev ARTIFACT=netlogger-compose VERSION=1.5.5 \
+  ./gradlew --no-daemon "-PGROUP=com.github.koai-dev.netlogger-compose" "-PVERSION_NAME=1.5.5" \
+  -Dmaven.repo.local=/tmp/netlogger-jitpack-m2 :netlogger:publishToMavenLocal
+```
+
+A failed JitPack build of a tag is cached; delete it on the JitPack page (requires
+push access to the repository) before building that tag again.
 
 References: [plugin configuration](https://vanniktech.github.io/gradle-maven-publish-plugin/central/),
 [KMP publication configuration](https://vanniktech.github.io/gradle-maven-publish-plugin/what/#kotlin-multiplatform-library),

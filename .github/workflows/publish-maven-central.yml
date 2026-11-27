@@ -1,12 +1,17 @@
 name: Publish to Maven Central
 
 on:
+  # A release tag (the same tag JitPack builds) uploads that version; finish it in the Central Portal.
+  push:
+    tags:
+      - '[0-9]+.[0-9]+.[0-9]+'
+      - '[0-9]+.[0-9]+.[0-9]+-*'
   workflow_dispatch:
     inputs:
       version:
         description: Release version (must not already exist on Central)
         required: true
-        default: '1.5.4'
+        default: '1.5.5'
       group_id:
         description: Verified Central Portal namespace
         required: true
@@ -26,6 +31,17 @@ jobs:
     environment: maven-central
     steps:
       - uses: actions/checkout@v4
+      - name: Check that the tag matches VERSION_NAME
+        if: github.event_name == 'push'
+        env:
+          TAG: ${{ github.ref_name }}
+        run: |
+          set -euo pipefail
+          declared=$(sed -n 's/^VERSION_NAME=//p' gradle.properties)
+          if [[ "$TAG" != "$declared" ]]; then
+            echo "Tag $TAG does not match VERSION_NAME=$declared in gradle.properties" >&2
+            exit 1
+          fi
       - uses: actions/setup-java@v4
         with:
           distribution: temurin
@@ -42,8 +58,8 @@ jobs:
         run: ./scripts/verify-ui-tests.sh ios
       - name: Upload signed publications to Central Portal
         env:
-          CENTRAL_GROUP_ID: ${{ inputs.group_id }}
-          RELEASE_VERSION: ${{ inputs.version }}
+          CENTRAL_GROUP_ID: ${{ inputs.group_id || 'io.github.koai-dev' }}
+          RELEASE_VERSION: ${{ inputs.version || github.ref_name }}
           ORG_GRADLE_PROJECT_mavenCentralUsername: ${{ secrets.MAVEN_CENTRAL_USERNAME }}
           ORG_GRADLE_PROJECT_mavenCentralPassword: ${{ secrets.MAVEN_CENTRAL_PASSWORD }}
           ORG_GRADLE_PROJECT_signingInMemoryKey: ${{ secrets.SIGNING_IN_MEMORY_KEY }}

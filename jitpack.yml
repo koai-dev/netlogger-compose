@@ -1,0 +1,8 @@
+# JitPack builds a pushed tag (or commit) on Linux and serves it as
+# com.github.koai-dev.netlogger-compose:netlogger:<tag>: a multi-artifact build is
+# served under com.github.<user>.<repository>, so the publications use that group and
+# their Gradle module metadata matches the served coordinates. The JDK comes from
+# gradle/gradle-daemon-jvm.properties; netlogger/build.gradle.kts skips GPG signing when
+# JITPACK is set. Android and the iOS KLIBs (cross-compiled by Kotlin) are published.
+install:
+  - ./gradlew --no-daemon --console=plain "-PGROUP=$GROUP.$ARTIFACT" "-PVERSION_NAME=$VERSION" -Pkotlin.native.ignoreDisabledTargets=true :netlogger:publishToMavenLocal

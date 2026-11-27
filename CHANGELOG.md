@@ -1,5 +1,20 @@
 # Changelog
 
+## 1.5.5 — unreleased
+
+- Ktor: capture in-memory `ByteArray` request bodies (any `ByteArrayContent`),
+  not only `TextContent`, and log the body's `Content-Type` with the request
+  headers. Clients that send serialized bytes, and the calls that fail, now show
+  their request body.
+- Ktor: capture textual response bodies without `Content-Length` (chunked, or gzip
+  that OkHttp/Darwin already decoded) up to `maxBodyBytes`. Unknown-length
+  streaming types (`text/event-stream`, NDJSON, JSON sequences) are not read, so
+  the caller never waits for an open stream.
+- Publish every release tag to JitPack as well as Maven Central:
+  `com.github.koai-dev.netlogger-compose:netlogger:<tag>` with Android and iOS
+  publications, unsigned on JitPack (`jitpack.yml`). Pushing a release tag also
+  starts the Maven Central upload, which checks the tag against `VERSION_NAME`.
+
 ## 1.5.4 — 2026-11-17
 
 - Update Kotlin to 2.4.21, Compose Multiplatform to 1.12.2, Android Gradle

@@ -16,6 +16,10 @@ plugins {
 group = providers.gradleProperty("GROUP").get()
 version = providers.gradleProperty("VERSION_NAME").get()
 
+// JitPack (see jitpack.yml) builds a pushed tag on Linux, where no signing key exists; it passes its own GROUP and
+// VERSION_NAME. Maven Central publishing everywhere else stays signed.
+val jitpack = providers.environmentVariable("JITPACK").map(String::toBoolean).orElse(false).get()
+
 kotlin {
     compilerOptions.freeCompilerArgs.add("-Xexpect-actual-classes")
     android {
@@ -105,7 +109,8 @@ tasks.register("localBuild") { dependsOn("assemble", "linkDebugFrameworkIosSimul
 
 mavenPublishing {
     publishToMavenCentral(automaticRelease = false)
-    signAllPublications()
+    // Maven Central requires signatures; JitPack has no key and serves unsigned artifacts.
+    if (!jitpack) signAllPublications()
     pom {
         name.set("Netlogger Compose")
         description.set("A Kotlin Multiplatform network logger with shared Compose UI for Android and iOS.")
@@ -132,26 +137,29 @@ mavenPublishing {
     }
 }
 
-val signingConfiguration = extensions.getByType<SigningExtension>()
-if (providers.gradleProperty("signing.useGpgCmd").map { it.toBoolean() }.orElse(false).get()) {
-    signingConfiguration.useGpgCmd()
-}
+// Release signing exists only outside JitPack, where signAllPublications() applied the signing plugin.
+if (!jitpack) {
+    val signingConfiguration = extensions.getByType<SigningExtension>()
+    if (providers.gradleProperty("signing.useGpgCmd").map { it.toBoolean() }.orElse(false).get()) {
+        signingConfiguration.useGpgCmd()
+    }
 
-val verifyNetloggerSigningCredentials = tasks.register("verifyNetloggerSigningCredentials") {
-    group = "publishing"
-    description = "Checks that a release signing identity is configured without uploading artifacts."
-    doLast {
-        if (!project.version.toString().endsWith("-SNAPSHOT") && signingConfiguration.signatory == null) {
-            throw GradleException(
-                "No GPG signing identity is configured. Central tokens do not configure signing. " +
-                    "For a local GPG key, set signing.useGpgCmd=true and signing.gnupg.keyName " +
-                    "in ~/.gradle/gradle.properties; alternatively configure signingInMemoryKey " +
-                    "or signing.keyId/password/secretKeyRingFile. See docs/maven-central.md."
-            )
+    val verifyNetloggerSigningCredentials = tasks.register("verifyNetloggerSigningCredentials") {
+        group = "publishing"
+        description = "Checks that a release signing identity is configured without uploading artifacts."
+        doLast {
+            if (!project.version.toString().endsWith("-SNAPSHOT") && signingConfiguration.signatory == null) {
+                throw GradleException(
+                    "No GPG signing identity is configured. Central tokens do not configure signing. " +
+                        "For a local GPG key, set signing.useGpgCmd=true and signing.gnupg.keyName " +
+                        "in ~/.gradle/gradle.properties; alternatively configure signingInMemoryKey " +
+                        "or signing.keyId/password/secretKeyRingFile. See docs/maven-central.md."
+                )
+            }
         }
     }
+    tasks.withType<Sign>().configureEach { dependsOn(verifyNetloggerSigningCredentials) }
 }
-tasks.withType<Sign>().configureEach { dependsOn(verifyNetloggerSigningCredentials) }
 
 publishing.repositories.maven {
     name = "localStaging"

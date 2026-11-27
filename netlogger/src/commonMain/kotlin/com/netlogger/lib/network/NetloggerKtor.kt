@@ -15,6 +15,7 @@ import io.ktor.client.plugins.api.Send
 import io.ktor.client.plugins.api.createClientPlugin
 import io.ktor.client.statement.request
 import io.ktor.http.HttpHeaders
+import io.ktor.http.content.OutgoingContent
 import io.ktor.http.content.TextContent
 import io.ktor.http.contentLength
 import io.ktor.http.contentType
@@ -49,9 +50,9 @@ fun HttpClientConfig<*>.netlogger(
             val bodies = requested.body && config.maximumLogLevel.body && config.captureBodies
             if (!info) return@on proceed(request)
             val start = currentTimeMillis()
-            val requestBody = (request.body as? TextContent)?.takeIf {
-                bodies && it.text.length.toLong() <= config.maxBodyBytes && it.text.encodeToByteArray().size <= config.maxBodyBytes && isText(it.contentType.toString())
-            }?.let { redactor.redactBody(it.text, it.contentType.toString()) }
+            val requestBody = if (bodies) requestBodyText(request.body, config.maxBodyBytes)?.let { (text, type) -> redactor.redactBody(text, type) } else null
+            // The body's Content-Type travels with the content, not in the request headers; record it with them.
+            val bodyType = (request.body as? OutgoingContent)?.contentType?.toString()
             val call = try {
                 proceed(request)
             } catch (error: Throwable) {
@@ -60,7 +61,7 @@ fun HttpClientConfig<*>.netlogger(
                 queue.trySend(LogEntry.Api(
                     tag = request.url.host, method = request.method.value,
                     url = redactor.redactUrl(request.url.buildString()),
-                    requestHeaders = if (headers) redactor.headersToJson(request.headers.entries().flatMap { (k, v) -> v.map { k to it } }) else null,
+                    requestHeaders = if (headers) redactor.headersToJson(withContentType(request.headers.entries().flatMap { (k, v) -> v.map { k to it } }, bodyType)) else null,
                     requestBody = requestBody, responseHeaders = null,
                     responseBody = if (bodies) redactor.redactText(error.message.orEmpty().take(config.maxGeneralMessageChars)).take(config.maxGeneralMessageChars) else null,
                     statusCode = 0, requestTime = start, responseTime = end, totalDuration = (end - start).coerceAtLeast(0)
@@ -73,7 +74,10 @@ fun HttpClientConfig<*>.netlogger(
             var responseBody: String? = null
             val length = response.contentLength()
             val type = response.contentType()?.toString()
-            if (bodies && length != null && length in 1..config.maxBodyBytes && isText(type) &&
+            // An unknown length (chunked, or gzip that the engine already decoded) is read up to the cap; streaming
+            // types are skipped then, since reading their prefix would wait for the stream instead of the body.
+            val readable = if (length == null) !isStreaming(type) else length in 1..config.maxBodyBytes
+            if (bodies && readable && isText(type) &&
                 response.headers[HttpHeaders.ContentEncoding].let { it == null || it == "identity" }) {
                 val original = response.rawContent
                 val prefix = original.readBuffer(config.maxBodyBytes + 1).readByteArray()
@@ -85,7 +89,7 @@ fun HttpClientConfig<*>.netlogger(
             queue.trySend(LogEntry.Api(
                 tag = response.request.url.host, method = response.request.method.value,
                 url = redactor.redactUrl(response.request.url.toString()),
-                requestHeaders = if (headers) redactor.headersToJson(response.request.headers.entries().flatMap { (k, v) -> v.map { k to it } }) else null,
+                requestHeaders = if (headers) redactor.headersToJson(withContentType(response.request.headers.entries().flatMap { (k, v) -> v.map { k to it } }, bodyType)) else null,
                 requestBody = requestBody,
                 responseHeaders = if (headers) redactor.headersToJson(response.headers.entries().flatMap { (k, v) -> v.map { k to it } }) else null,
                 responseBody = responseBody, statusCode = response.status.value,
@@ -96,6 +100,29 @@ fun HttpClientConfig<*>.netlogger(
     }
     install(plugin)
 }
+
+/**
+ * The text of an in-memory request body and its content type, or null when the body is streamed, not text or larger
+ * than [maxBytes]. Covers [TextContent] and any [OutgoingContent.ByteArrayContent], such as a `ByteArray` body.
+ */
+private fun requestBodyText(body: Any, maxBytes: Long): Pair<String, String>? {
+    val type = (body as? OutgoingContent)?.contentType?.toString()
+    if (!isText(type) || type == null) return null
+    return when (body) {
+        is TextContent -> body.text.takeIf { it.length.toLong() <= maxBytes && it.encodeToByteArray().size <= maxBytes }
+        is OutgoingContent.ByteArrayContent -> body.bytes().takeIf { it.size <= maxBytes }?.decodeToString()
+        else -> null
+    }?.let { it to type }
+}
+
+/** [entries] with the body's [type] as `Content-Type` when the headers do not already carry one. */
+private fun withContentType(entries: List<Pair<String, String>>, type: String?): List<Pair<String, String>> =
+    if (type == null || entries.any { (name, _) -> name.equals(HttpHeaders.ContentType, ignoreCase = true) }) entries
+    else entries + (HttpHeaders.ContentType to type)
+
+/** Content types whose body is an open-ended stream rather than one document. */
+private fun isStreaming(type: String?): Boolean = type != null &&
+    listOf("event-stream", "ndjson", "stream+json", "json-seq").any { it in type.lowercase() }
 
 private fun isText(type: String?): Boolean = type != null &&
     (type.startsWith("text/") || listOf("json", "xml", "x-www-form-urlencoded").any { it in type.lowercase() })
